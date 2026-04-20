@@ -9,7 +9,7 @@
       "description": "As a 训练工程师, I want _build_prompt() 优先从 category YAML 读取 tool_definitions so that 各 category 可独立配置工具列表。",
       "acceptanceCriteria": [
         "_build_prompt() 函数中 tool_definitions 取值改为: category_def.get('tool_definitions', TOOL_DEFINITIONS_TEXT)",
-        "param_reflection.yaml 和 java_coding.yaml 不含 tool_definitions 字段时，自动 fallback 到全局 TOOL_DEFINITIONS_TEXT",
+        "frontend_dev.yaml 和 java_coding.yaml 不含 tool_definitions 字段时，自动 fallback 到全局 TOOL_DEFINITIONS_TEXT",
         "全局 TOOL_DEFINITIONS_TEXT 常量保持不变",
         "python -c \"import generate_data\" 不报错"
       ],

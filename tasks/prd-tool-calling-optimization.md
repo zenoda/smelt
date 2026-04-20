@@ -19,13 +19,13 @@
 
 ### US-001: 修改 generate_data.py 支持 YAML 级别工具定义覆盖
 
-**Description:** 作为训练数据生成流程，我需要支持各 category YAML 独立配置工具定义，以便 tool_calling 可以使用完整版工具列表，而 param_reflection 继续使用全局默认的精简版。
+**Description:** 作为训练数据生成流程，我需要支持各 category YAML 独立配置工具定义，以便 tool_calling 可以使用完整版工具列表，而 frontend_dev 继续使用全局默认的精简版。
 
 **Acceptance Criteria:**
 - [ ] `_build_prompt()` 函数（约第 1461-1465 行）中，`tool_definitions` 的取值逻辑改为：优先从 `category_def.get("tool_definitions")` 读取，缺失时 fallback 到全局 `TOOL_DEFINITIONS_TEXT`
 - [ ] 具体改动：`"tool_definitions": TOOL_DEFINITIONS_TEXT` → `"tool_definitions": category_def.get("tool_definitions", TOOL_DEFINITIONS_TEXT)`
-- [ ] `param_reflection.yaml` 和 `java_coding.yaml` 无需修改，不包含 `tool_definitions` 字段时自动使用全局默认值
-- [ ] 运行 `python generate_data.py --dry-run` 或手动验证：tool_calling 使用 YAML 中的完整工具定义，param_reflection 使用全局默认值
+- [ ] `frontend_dev.yaml` 和 `java_coding.yaml` 无需修改，不包含 `tool_definitions` 字段时自动使用全局默认值
+- [ ] 运行 `python generate_data.py --dry-run` 或手动验证：tool_calling 使用 YAML 中的完整工具定义，frontend_dev 使用全局默认值
 
 ### US-002: 重写 tool_calling.yaml
 
@@ -146,7 +146,7 @@
 
 ## Non-Goals (Out of Scope)
 
-- **不修改 `param_reflection.yaml`**：该文件继续使用全局默认工具定义，本次不涉及
+- **不修改 `frontend_dev.yaml`**：该文件继续使用全局默认工具定义，本次不涉及
 - **不修改 `java_coding.yaml`**：该 category 不涉及工具调用，不受影响
 - **不修改 `generate_data.py` 的验证逻辑**（`validate_sample`、`_validate_tool_calls`）：当前的 XML 格式验证已足够，新增工具名不影响格式验证
 - **不修改 `generate_data.py` 的加载逻辑**（`load_categories`）：YAML 新增 `tool_definitions` 字段不在必填字段校验范围内，无需改动

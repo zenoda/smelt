@@ -1,7 +1,7 @@
 {
   "project": "CoPaw Training Pipeline",
   "branchName": "ralph/replace-param-reflection-with-frontend-dev",
-  "description": "删除 param_reflection 样本类型，新增 frontend_dev 前端开发样本类型（Vue3/TypeScript/ElementPlus），保持 50%/30%/20% 训练比例",
+  "description": "删除 frontend_dev 样本类型，新增 frontend_dev 前端开发样本类型（Vue3/TypeScript/ElementPlus），保持 50%/30%/20% 训练比例",
   "userStories": [
     {
       "id": "US-001",
@@ -81,17 +81,17 @@
     },
     {
       "id": "US-005",
-      "title": "删除 param_reflection 类型定义和种子数据文件",
-      "description": "作为维护者，我需要移除 param_reflection 的数据文件，避免遗留无用文件。",
+      "title": "删除 frontend_dev 类型定义和种子数据文件",
+      "description": "作为维护者，我需要移除 frontend_dev 的数据文件，避免遗留无用文件。",
       "acceptanceCriteria": [
-        "删除 data/categories/param_reflection.yaml",
-        "删除 data/seeds/param_reflection.jsonl",
+        "删除 data/categories/frontend_dev.yaml",
+        "删除 data/seeds/frontend_dev.jsonl",
         "data/categories/ 目录下只剩 java_coding.yaml、tool_calling.yaml、frontend_dev.yaml",
         "data/seeds/ 目录下只剩 java_coding.jsonl、tool_calling.jsonl、frontend_dev.jsonl",
         "ls data/categories/ 和 ls data/seeds/ 验证通过"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -101,13 +101,13 @@
       "acceptanceCriteria": [
         "config/config.yaml 中 data.category_ratios 更新为：java_coding: 0.50、tool_calling: 0.30、frontend_dev: 0.20",
         "config/config.example.yaml 中同步更新",
-        "移除 param_reflection 相关注释",
+        "移除 frontend_dev 相关注释",
         "新增 frontend_dev 的中文注释：# 前端开发样本",
         "两个文件中 category_ratios 的值总和为 1.0",
-        "python -c \"import yaml; c=yaml.safe_load(open('config/config.yaml')); r=c['data']['category_ratios']; assert abs(sum(r.values())-1.0)<0.01 and 'frontend_dev' in r and 'param_reflection' not in r\" 执行成功"
+        "python -c \"import yaml; c=yaml.safe_load(open('config/config.yaml')); r=c['data']['category_ratios']; assert abs(sum(r.values())-1.0)<0.01 and 'frontend_dev' in r and 'frontend_dev' not in r\" 执行成功"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -115,50 +115,50 @@
       "title": "更新 generate_data.py 中的硬编码默认比例",
       "description": "作为数据生成脚本，generate_data.py 中的硬编码默认 category_ratios 需要同步更新。",
       "acceptanceCriteria": [
-        "--merge 模式默认比例：param_reflection: 0.20 改为 frontend_dev: 0.20",
+        "--merge 模式默认比例：frontend_dev: 0.20 改为 frontend_dev: 0.20",
         "LLM 生成模式默认比例：同上",
-        "load_seeds() 函数文档注释中如有 param_reflection 示例，更新为 frontend_dev",
-        "grep -n param_reflection generate_data.py 返回空结果",
+        "load_seeds() 函数文档注释中如有 frontend_dev 示例，更新为 frontend_dev",
+        "grep -n frontend_dev generate_data.py 返回空结果",
         "python -c \"import generate_data\" 不报错"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": "全文搜索 param_reflection 确保无遗漏，注意检查注释和文档字符串。"
+      "passes": true,
+      "notes": "全文搜索 frontend_dev 确保无遗漏，注意检查注释和文档字符串。"
     },
     {
       "id": "US-008",
       "title": "更新 train.py 中的类别推断逻辑",
       "description": "作为训练流程，train.py 的 _infer_category() 函数需要能正确推断 frontend_dev 类型。",
       "acceptanceCriteria": [
-        "删除 _infer_category() 中 param_reflection 的关键词推断逻辑（param_keywords 检测段）",
+        "删除 _infer_category() 中 frontend_dev 的关键词推断逻辑（param_keywords 检测段）",
         "新增 frontend_dev 内容推断逻辑：检测关键词 Vue、ElementPlus、Element Plus、前端、组件、Composition API、Pinia、Vite 等",
         "推断优先级：metadata.category > 工具调用检测 > 前端关键词检测 > 默认 java_coding",
         "更新函数文档注释",
-        "grep -n param_reflection train.py 返回空结果",
+        "grep -n frontend_dev train.py 返回空结果",
         "python -c \"import train\" 不报错"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
       "id": "US-009",
-      "title": "删除 test_model.py 中的 param_reflection 评估并更新引用",
-      "description": "作为评估流程，需要删除 test_param_reflection 函数，并将 evaluate_model 等函数中的 param_reflection 引用更新为 frontend_dev 占位。",
+      "title": "删除 test_model.py 中的 frontend_dev 评估并更新引用",
+      "description": "作为评估流程，需要删除 test_frontend_dev 函数，并将 evaluate_model 等函数中的 frontend_dev 引用更新为 frontend_dev 占位。",
       "acceptanceCriteria": [
-        "删除 test_param_reflection() 函数（约 L857 起）",
-        "在 evaluate_model() 中将 param_results, param_score = test_param_reflection(...) 替换为 frontend_results, frontend_score = test_frontend_dev(...) 的调用（此时 test_frontend_dev 可以是一个返回空列表和 0 分的临时占位函数）",
-        "更新 evaluation['dimensions'] 中的 key：param_reflection → frontend_dev",
+        "删除 test_frontend_dev() 函数（约 L857 起）",
+        "在 evaluate_model() 中将 param_results, param_score = test_frontend_dev(...) 替换为 frontend_results, frontend_score = test_frontend_dev(...) 的调用（此时 test_frontend_dev 可以是一个返回空列表和 0 分的临时占位函数）",
+        "更新 evaluation['dimensions'] 中的 key：frontend_dev → frontend_dev",
         "更新 overall 计算公式中的变量名",
         "更新 verbose 输出中的维度名称",
         "更新 dimension_names 映射：'frontend_dev': '前端开发'",
-        "更新所有遍历维度 key 的循环中的 param_reflection → frontend_dev",
+        "更新所有遍历维度 key 的循环中的 frontend_dev → frontend_dev",
         "创建 test_frontend_dev() 占位函数，返回 ([], 0.0)",
-        "grep -n param_reflection test_model.py 返回空结果",
+        "grep -n frontend_dev test_model.py 返回空结果",
         "python -c \"import test_model\" 不报错"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "先删除旧函数并创建占位，下一个 story 再实现完整的 test_frontend_dev。"
     },
     {
@@ -174,24 +174,24 @@
         "python -c \"import test_model\" 不报错"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "替换 US-009 中的占位函数。评估以关键词/模式匹配为主，辅以启发式规则。"
     },
     {
       "id": "US-011",
       "title": "更新 extract_seeds.py",
-      "description": "作为种子提取工具，需要移除 param_reflection 的提取逻辑，适配 frontend_dev。",
+      "description": "作为种子提取工具，需要移除 frontend_dev 的提取逻辑，适配 frontend_dev。",
       "acceptanceCriteria": [
-        "删除 from generate_data import generate_param_reflection 导入语句",
-        "删除 extract_param_reflection() 函数",
-        "删除 main() 中对 extract_param_reflection() 的调用和输出",
-        "更新文件验证列表：param_reflection.jsonl → frontend_dev.jsonl",
+        "删除 from generate_data import generate_frontend_dev 导入语句",
+        "删除 extract_frontend_dev() 函数",
+        "删除 main() 中对 extract_frontend_dev() 的调用和输出",
+        "更新文件验证列表：frontend_dev.jsonl → frontend_dev.jsonl",
         "在 main() 中添加对 frontend_dev.jsonl 的存在性检查和格式验证（非提取）",
         "python extract_seeds.py 可正常运行不报错",
-        "grep -n param_reflection extract_seeds.py 返回空结果"
+        "grep -n frontend_dev extract_seeds.py 返回空结果"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "frontend_dev 种子是手写 JSONL，不从 generate_data.py 提取。"
     },
     {
@@ -199,29 +199,29 @@
       "title": "更新 README.md",
       "description": "作为项目文档，README 需要反映新的样本类型列表和比例。",
       "acceptanceCriteria": [
-        "更新项目目录结构说明：param_reflection.yaml → frontend_dev.yaml，param_reflection.jsonl → frontend_dev.jsonl",
-        "更新样本类型比例表格：param_reflection 20% → frontend_dev 20% Vue3/ElementPlus/TypeScript/CSS 前端开发",
-        "所有对 param_reflection 的描述性文字同步更新",
-        "grep -n param_reflection README.md 返回空结果"
+        "更新项目目录结构说明：frontend_dev.yaml → frontend_dev.yaml，frontend_dev.jsonl → frontend_dev.jsonl",
+        "更新样本类型比例表格：frontend_dev 20% → frontend_dev 20% Vue3/ElementPlus/TypeScript/CSS 前端开发",
+        "所有对 frontend_dev 的描述性文字同步更新",
+        "grep -n frontend_dev README.md 返回空结果"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
       "id": "US-013",
-      "title": "清理所有文件中的 param_reflection 残留引用",
-      "description": "作为代码库维护，需要全局清理所有文件中对 param_reflection 的引用。",
+      "title": "清理所有文件中的 frontend_dev 残留引用",
+      "description": "作为代码库维护，需要全局清理所有文件中对 frontend_dev 的引用。",
       "acceptanceCriteria": [
-        "清理 prd.json 中的 param_reflection 引用（如有）",
-        "清理 archive/2026-04-20-pluggable-sample-categories/prd.json 中的 param_reflection 引用",
-        "清理 tasks/prd-tool-calling-optimization.md 中的 param_reflection 引用",
-        "git grep param_reflection 返回空结果（零残留）",
-        "git grep param_reflection -- ':(exclude)tasks/prd-replace-param-reflection-with-frontend-dev.md' 返回空结果（PRD 文件本身除外）"
+        "清理 prd.json 中的 frontend_dev 引用（如有）",
+        "清理 archive/2026-04-20-pluggable-sample-categories/prd.json 中的 frontend_dev 引用",
+        "清理 tasks/prd-tool-calling-optimization.md 中的 frontend_dev 引用",
+        "git grep frontend_dev 返回空结果（零残留）",
+        "git grep frontend_dev -- ':(exclude)tasks/prd-replace-param-reflection-with-frontend-dev.md' 返回空结果（PRD 文件本身除外）"
       ],
       "priority": 13,
       "passes": false,
-      "notes": "最后一步，确保全局零残留。PRD 源文件本身可以保留 param_reflection 文字。"
+      "notes": "最后一步，确保全局零残留。PRD 源文件本身可以保留 frontend_dev 文字。"
     }
   ]
 }

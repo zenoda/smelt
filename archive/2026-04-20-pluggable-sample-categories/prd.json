@@ -11,7 +11,7 @@
         "创建 data/categories/ 目录",
         "将 java_coding 类型从 generate_data.py 的 META_PROMPTS、SUBCATEGORIES、SCENARIO_INSTRUCTIONS 等硬编码常量提取为 data/categories/java_coding.yaml，包含 name、description、subcategories、meta_prompt、extra_instructions 字段",
         "将 tool_calling 类型提取为 data/categories/tool_calling.yaml，结构同上",
-        "将 param_reflection 类型提取为 data/categories/param_reflection.yaml，结构同上",
+        "将 frontend_dev 类型提取为 data/categories/frontend_dev.yaml，结构同上",
         "每个 YAML 的 meta_prompt 模板支持占位符：{seed_example}、{difficulty_instruction}、{subcategory}、{tool_definitions}、{extra_instruction}、{batch_size}",
         "meta_prompt 模板要求 LLM 返回 JSON 数组格式 [{\"messages\": [...]}, ...] 而非单个对象",
         "YAML 文件可被 Python yaml.safe_load() 正常解析"
@@ -42,7 +42,7 @@
       "description": "As a 训练工程师, I want prompt 构建逻辑从动态加载的类型定义中读取模板和指令 so that 不再依赖硬编码分支。",
       "acceptanceCriteria": [
         "_build_prompt() 签名改为接收 category_def dict（而非 category 字符串），从中获取 meta_prompt 模板和 extra_instructions",
-        "删除 _build_prompt() 中 if category == 'java_coding' / 'tool_calling' / 'param_reflection' 的硬编码分支",
+        "删除 _build_prompt() 中 if category == 'java_coding' / 'tool_calling' / 'frontend_dev' 的硬编码分支",
         "模板格式化时 extra_instruction 从 category_def['extra_instructions'][subcategory] 查找，找不到时使用空字符串",
         "tool_definitions 作为通用 kwarg 传入，模板中有 {tool_definitions} 占位符就填充",
         "新增 {batch_size} 占位符支持",
