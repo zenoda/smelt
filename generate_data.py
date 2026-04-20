@@ -171,7 +171,7 @@ def load_seeds(seeds_dir: str = "data/seeds") -> Dict[str, List[Dict]]:
         {
             "java_coding": [{"messages": [...], "metadata": {...}}, ...],
             "tool_calling": [...],
-            "param_reflection": [...]
+            "frontend_dev": [...]
         }
     """
     seeds_path = SCRIPT_DIR / seeds_dir
@@ -1952,7 +1952,7 @@ def main():
         ratios = get(cfg, "data.category_ratios", {
             "java_coding": 0.50,
             "tool_calling": 0.30,
-            "param_reflection": 0.20,
+            "frontend_dev": 0.20,
         })
         similarity_threshold = get(cfg, "data.dedup_similarity_threshold", 0.85)
         merge_seed = get(cfg, "data.split_seed", 42)
@@ -2022,7 +2022,7 @@ def main():
     ratios = get(cfg, "data.category_ratios", {
         "java_coding": 0.50,
         "tool_calling": 0.30,
-        "param_reflection": 0.20,
+        "frontend_dev": 0.20,
     })
 
     if requested_categories and len(requested_categories) == 1:
