@@ -856,21 +856,188 @@ def test_task_planning(model, tokenizer, verbose=True):
 
 def test_frontend_dev(model, tokenizer, verbose=True):
     """
-    测试前端开发能力（占位函数）。
+    测试前端开发能力，返回 (results, score_0_to_100)。
 
-    完整实现将在 US-010 中添加，包含 8-10 个测试用例覆盖全部子类别。
-    当前版本返回空结果和 0 分。
+    评分维度（每个用例）：
+    - 代码正确性 (40%): check_fn 检查回复中的关键代码模式
+    - 最佳实践 (30%): practice_keywords 检查是否遵循 Vue3/TS 最佳实践
+    - 解释清晰度 (30%): 代码块完整性 + 中文解释可见性
 
-    返回:
-        tuple: (results: list[dict], score: float)
+    测试用例覆盖全部 8 个子类别：
+    - vue3_basics, vue3_components, element_plus, typescript_vue,
+      axios_http, css_layout, state_management, frontend_engineering
     """
+    test_cases = [
+        {
+            "prompt": "Vue3 中 ref 和 reactive 有什么区别？分别适合什么场景？",
+            "description": "Vue3基础 - ref vs reactive",
+            "subcategory": "vue3_basics",
+            "check_fn": lambda r: "ref" in r and "reactive" in r and (".value" in r or "value" in r),
+            "practice_keywords": ["<script setup", "lang=\"ts\"", "import", "ref(", "reactive("],
+        },
+        {
+            "prompt": "Vue3 Composition API 中 watch 和 watchEffect 有什么区别？请给出代码示例。",
+            "description": "Vue3基础 - watch vs watchEffect",
+            "subcategory": "vue3_basics",
+            "check_fn": lambda r: "watch" in r and "watchEffect" in r,
+            "practice_keywords": ["<script setup", "import", "watch(", "watchEffect(", "onCleanup"],
+        },
+        {
+            "prompt": "如何使用 defineProps 和 defineEmits 实现 Vue3 父子组件通信？请给出完整示例。",
+            "description": "组件开发 - props/emits 通信",
+            "subcategory": "vue3_components",
+            "check_fn": lambda r: "defineProps" in r and "defineEmits" in r,
+            "practice_keywords": ["<script setup", "lang=\"ts\"", "defineProps<", "defineEmits<", "emit("],
+        },
+        {
+            "prompt": "Vue3 中的插槽（slot）有哪些类型？如何使用作用域插槽？请给出示例。",
+            "description": "组件开发 - 插槽机制",
+            "subcategory": "vue3_components",
+            "check_fn": lambda r: "slot" in r.lower() and ("<slot" in r or "#default" in r or "v-slot" in r),
+            "practice_keywords": ["<slot", "name=", "#default", "v-slot", "<template"],
+        },
+        {
+            "prompt": "如何使用 ElementPlus 的 ElForm 实现一个带验证的登录表单？要求包含用户名和密码字段。",
+            "description": "ElementPlus - 表单验证",
+            "subcategory": "element_plus",
+            "check_fn": lambda r: ("el-form" in r.lower() or "ElForm" in r) and ("rules" in r or "validate" in r),
+            "practice_keywords": ["el-form", "el-form-item", "el-input", "rules", "FormRules", "FormInstance"],
+        },
+        {
+            "prompt": "在 Vue3 + TypeScript 项目中如何为组件的 props 和 emits 提供完整的类型标注？",
+            "description": "TypeScript + Vue - 类型标注",
+            "subcategory": "typescript_vue",
+            "check_fn": lambda r: ("defineProps<" in r or "PropType" in r) and ("interface" in r or "type " in r),
+            "practice_keywords": ["<script setup", "lang=\"ts\"", "defineProps<", "interface", "withDefaults"],
+        },
+        {
+            "prompt": "如何封装 axios 实现统一的请求拦截器和响应拦截器？要求包含 token 注入和错误处理。",
+            "description": "axios - 拦截器封装",
+            "subcategory": "axios_http",
+            "check_fn": lambda r: "interceptors" in r and ("request" in r and "response" in r),
+            "practice_keywords": ["axios.create", "interceptors.request", "interceptors.response", "Authorization", "Bearer"],
+        },
+        {
+            "prompt": "请用 CSS Flexbox 实现一个经典的三栏布局（左侧固定宽度、中间自适应、右侧固定宽度）。",
+            "description": "CSS布局 - Flex三栏布局",
+            "subcategory": "css_layout",
+            "check_fn": lambda r: "flex" in r.lower() and ("flex:" in r or "flex-grow" in r or "flex: 1" in r),
+            "practice_keywords": ["display: flex", "flex-shrink", "flex:", "flex-grow"],
+        },
+        {
+            "prompt": "如何使用 Pinia 定义一个 store？请分别展示 Options API 和 Composition API 两种写法。",
+            "description": "状态管理 - Pinia store",
+            "subcategory": "state_management",
+            "check_fn": lambda r: "defineStore" in r and ("state" in r or "ref(" in r),
+            "practice_keywords": ["defineStore", "pinia", "storeToRefs", "computed", "ref("],
+        },
+        {
+            "prompt": "如何在 Vite 项目中配置路径别名和开发代理？请给出 vite.config.ts 的完整配置。",
+            "description": "前端工程化 - Vite配置",
+            "subcategory": "frontend_engineering",
+            "check_fn": lambda r: ("resolve" in r or "alias" in r) and ("proxy" in r or "server" in r),
+            "practice_keywords": ["defineConfig", "resolve.alias", "@/", "proxy", "changeOrigin", "vite"],
+        },
+    ]
+
     if verbose:
         print("\n" + "=" * 60)
-        print("测试4：前端开发能力（占位）")
+        print("测试4：前端开发能力")
         print("=" * 60)
-        print("  [占位] 完整评估将在后续迭代实现")
-        print("  前端开发维度得分: 0.0/100")
-    return [], 0.0
+
+    results = []
+    subcategory_scores = {}
+
+    for i, tc in enumerate(test_cases, 1):
+        if verbose:
+            print(f"\n[{i}/{len(test_cases)}] {tc['description']} [{tc['subcategory']}]")
+            print(f"  问题: {tc['prompt'][:80]}...")
+
+        messages = [
+            {"role": "system", "content": "你是一位资深前端开发工程师，精通 Vue3、TypeScript、ElementPlus、axios、CSS 等技术栈。请用简洁准确的语言回答问题，代码示例要完整可运行。"},
+            {"role": "user", "content": tc["prompt"]},
+        ]
+
+        response = generate(messages, model, tokenizer)
+        if verbose:
+            print(f"  回复长度: {len(response)} 字符")
+
+        # (1) 代码正确性 (40%): check_fn 检查关键代码模式
+        correct = tc["check_fn"](response)
+        correctness_score = 1.0 if correct else 0.0
+
+        # (2) 最佳实践 (30%): 检查 practice_keywords 命中率
+        practice_hits = [kw for kw in tc["practice_keywords"] if kw.lower() in response.lower()]
+        practice_rate = len(practice_hits) / len(tc["practice_keywords"]) if tc["practice_keywords"] else 1.0
+        practice_score = min(1.0, practice_rate)
+
+        # (3) 解释清晰度 (30%): 代码块完整性 + 中文解释
+        code_info = _check_code_blocks(response)
+        code_block_score = 0.0
+        if code_info["has_code_block"]:
+            code_block_score += 0.5
+        if code_info["all_closed"]:
+            code_block_score += 0.3
+        if code_info["has_language_tag"]:
+            code_block_score += 0.2
+        # 中文解释可见性加权（检查是否有中文说明文字）
+        has_chinese_explanation = any(
+            kw in response for kw in ["要点", "关键", "注意", "建议", "说明", "区别", "总结", "示例"]
+        )
+        explanation_score = code_block_score * 0.7 + (1.0 if has_chinese_explanation else 0.3) * 0.3
+
+        # 综合得分
+        case_score = correctness_score * 0.40 + practice_score * 0.30 + explanation_score * 0.30
+
+        scoring_breakdown = {
+            "correctness_score": round(correctness_score, 3),
+            "correctness_weight": 0.40,
+            "practice_score": round(practice_score, 3),
+            "practice_weight": 0.30,
+            "practice_hits": practice_hits,
+            "practice_total": len(tc["practice_keywords"]),
+            "explanation_score": round(explanation_score, 3),
+            "explanation_weight": 0.30,
+            "code_block_detail": code_info,
+            "has_chinese_explanation": has_chinese_explanation,
+            "subcategory": tc["subcategory"],
+        }
+
+        # 汇总子类别得分
+        subcat = tc["subcategory"]
+        if subcat not in subcategory_scores:
+            subcategory_scores[subcat] = []
+        subcategory_scores[subcat].append(case_score)
+
+        if verbose:
+            print(f"  代码正确性: {'通过' if correct else '未通过'}")
+            print(f"  最佳实践: {len(practice_hits)}/{len(tc['practice_keywords'])} ({practice_rate:.0%})")
+            print(f"  代码块: {'完整' if code_info['all_closed'] else ('有但未闭合' if code_info['has_code_block'] else '无')}"
+                  f" ({code_info['code_blocks_count']}个)")
+            print(f"  综合得分: {case_score:.1%}")
+
+        results.append({
+            "description": tc["description"],
+            "prompt": tc["prompt"],
+            "correct": correct,
+            "response": response[:800],
+            "score": case_score,
+            "subcategory": tc["subcategory"],
+            "scoring_breakdown": scoring_breakdown,
+        })
+
+    # 维度得分 = 各用例综合得分的平均值
+    dimension_score = round(sum(r["score"] for r in results) / len(results) * 100, 1) if results else 0.0
+
+    if verbose:
+        correct_count = sum(1 for r in results if r["correct"])
+        print(f"\n前端开发正确率: {correct_count}/{len(results)}")
+        print(f"\n子类别得分:")
+        for subcat, scores in sorted(subcategory_scores.items()):
+            avg = sum(scores) / len(scores) * 100
+            print(f"  {subcat}: {avg:.1f}/100 ({len(scores)}个用例)")
+        print(f"\n前端开发维度得分: {dimension_score}/100")
+    return results, dimension_score
 
 
 # ============================================================
