@@ -220,7 +220,7 @@
         "git grep frontend_dev -- ':(exclude)tasks/prd-replace-param-reflection-with-frontend-dev.md' 返回空结果（PRD 文件本身除外）"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "最后一步，确保全局零残留。PRD 源文件本身可以保留 frontend_dev 文字。"
     }
   ]

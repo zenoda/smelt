@@ -1,0 +1,33 @@
+## Codebase Patterns
+- 样本类型定义使用 data/categories/*.yaml 文件，load_categories() 自动扫描加载
+- 种子数据使用 data/seeds/*.jsonl 文件，每行一个 JSON 对象，包含 messages + metadata
+- metadata 结构：{"category": "xxx", "subcategory": "xxx", "difficulty": "basic|intermediate|advanced"}
+- system 提示词定义在对应的 YAML meta_prompt 中，种子数据的第一条 message 也必须是 system role
+- config/config.yaml 中的 category_ratios 定义各类型生成比例，总和为 1.0
+- generate_data.py 中有两处硬编码默认比例（--merge 模式和 LLM 生成模式），修改类型时需同步更新
+- train.py 的 _infer_category() 用内容关键词推断类别，添加新类型需在此函数增加检测逻辑
+- test_model.py 中每个类型有对应的 test_xxx() 评估函数，evaluate_model() 汇总所有维度
+- extract_seeds.py 已简化为种子文件验证工具（不再从 generate_data.py 提取）
+- config.yaml 被 .gitignore 忽略，需要 git add -f 强制添加
+---
+
+## 2026-04-20 - US-001 ~ US-013
+- 完成所有 13 个用户故事：删除 param_reflection 样本类型，新增 frontend_dev 前端开发样本类型
+- 创建 data/categories/frontend_dev.yaml（8 个子类别：vue3_basics, vue3_components, element_plus, typescript_vue, axios_http, css_layout, state_management, frontend_engineering）
+- 创建 data/seeds/frontend_dev.jsonl（19 条手写种子样本，覆盖全部子类别）
+- 删除 data/categories/param_reflection.yaml 和 data/seeds/param_reflection.jsonl
+- 更新 config/config.yaml 和 config/config.example.yaml 比例为 java_coding:0.50, tool_calling:0.30, frontend_dev:0.20
+- 更新 generate_data.py（硬编码默认比例、文档注释）
+- 更新 train.py（_infer_category 前端关键词检测）
+- 更新 test_model.py（删除 test_param_reflection，实现 test_frontend_dev 含 10 个测试用例）
+- 重写 extract_seeds.py 为种子文件验证工具
+- 更新 README.md 目录结构和比例表格
+- 清理所有文件中的 param_reflection 残留（archive prd.json, tasks md, prd.json）
+- Files changed: data/categories/frontend_dev.yaml, data/seeds/frontend_dev.jsonl, config/config.yaml, config/config.example.yaml, generate_data.py, train.py, test_model.py, extract_seeds.py, README.md, prd.json, archive/*/prd.json, tasks/prd-tool-calling-optimization.md
+- **Learnings for future iterations:**
+  - US-001 的 frontend_dev.yaml 已在之前的迭代中创建并提交
+  - load_categories() 返回 Dict[str, dict] 不是列表，PRD 中的验证命令需要适配
+  - python -c "import train" 因 Unsloth 需要 GPU 而在无 GPU 环境中失败，属于环境问题非代码问题
+  - extract_seeds.py 中的旧版 generate_xxx() 函数已在可插拔类型重构中被移除，脚本已简化为验证工具
+  - config/config.yaml 在 .gitignore 中，需要 git add -f 强制添加
+---
