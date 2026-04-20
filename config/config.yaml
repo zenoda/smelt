@@ -10,7 +10,8 @@
 model:
   # 基础模型路径（本地路径或 HuggingFace/ModelScope 模型ID）
   # 必须设置！请替换为你的实际模型路径
-  path: ""  # 例如: "/path/to/your/model" 或 "Qwen/Qwen2.5-7B"
+  # 例如: "/path/to/your/model" 或 "Qwen/Qwen2.5-7B"
+  path: "/home/chengda/.cache/modelscope/hub/models/AgentScope/CoPaw-Flash-9B"
 
   # 量化参数
   # load_in_4bit: 使用4-bit量化加载模型（QLoRA必须开启），显存占用约10-12GB
@@ -125,7 +126,7 @@ training:
 # ------------------------------------------------------------
 data:
   # 训练数据文件路径（merge 后的最终文件）
-  training_data_path: "training_data.jsonl"
+  training_data_path: "data/training_data.jsonl"
 
   # 种子样本目录（手写的高质量样本）
   seeds_dir: "data/seeds"
@@ -173,9 +174,12 @@ data:
   # LLM API 配置（用于数据生成）
   # 也可通过环境变量设置：LLM_API_BASE, LLM_API_KEY, LLM_MODEL
   llm_api:
-    base_url: "https://api.openai.com/v1"
-    api_key: ""       # 建议通过环境变量 LLM_API_KEY 设置，避免泄露
-    model: "gpt-4o"   # 推荐使用高质量模型生成训练数据
+    #base_url: "https://opencode.ai/zen/go/v1"
+    #api_key: "sk-VyHgaGAZnapLHzCNE1E8c5eJf5QMWWok7WYpVCwjwwxuDjwJ4YqDEGaZB05tzNQ4"
+    #model: "qwen3.6-plus"
+    base_url: "https://api.deepseek.com/v1"
+    api_key: "sk-290bf5a6623247729e5c1d76ecbd4e98"
+    model: "deepseek-reasoner"
 
 # ------------------------------------------------------------
 # 输出路径配置
