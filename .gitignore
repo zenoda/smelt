@@ -1,0 +1,46 @@
+# Python virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# LoRA adapter weights
+*_lora/
+
+# Merged model weights (large files)
+*_merged/
+
+# Training checkpoints
+outputs_*/
+
+# Unsloth compiled kernel cache
+unsloth_compiled_cache/
+
+# TensorBoard logs
+runs/
+
+# Experiment records
+experiments/
+
+# Generated training data
+data/generated/
+
+# Merged training data file
+training_data.jsonl
+
+# Data quality review artifacts
+rejected_samples.jsonl
+data_report.json
+.review_edit_tmp.json
+
+# Test results and comparison reports
+test_results.json
+test_results_compare.json
+test_report.md
+
+# Runtime config (template is config/config.example.yaml)
+config/config.yaml
+
+# nohup output
+nohup.out

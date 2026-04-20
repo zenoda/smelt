@@ -1,0 +1,252 @@
+# ============================================================
+# QLoRA 微调训练配置文件
+# 复制此文件为 config.yaml 后修改使用
+# cp config/config.example.yaml config/config.yaml
+# ============================================================
+
+# ------------------------------------------------------------
+# 模型配置
+# ------------------------------------------------------------
+model:
+  # 基础模型路径（本地路径或 HuggingFace/ModelScope 模型ID）
+  # 必须设置！请替换为你的实际模型路径
+  path: ""  # 例如: "/path/to/your/model" 或 "Qwen/Qwen2.5-7B"
+
+  # 量化参数
+  # load_in_4bit: 使用4-bit量化加载模型（QLoRA必须开启），显存占用约10-12GB
+  # load_in_16bit: 使用16-bit加载（全精度微调时使用），显存占用约18-20GB
+  # 两者互斥，不能同时为true
+  load_in_4bit: true
+  load_in_16bit: false
+
+  # 是否全参数微调（true=全参数，false=LoRA）
+  # 全参数微调需要大量显存（>40GB），RTX 2080 Ti 不建议开启
+  full_finetuning: false
+
+# ------------------------------------------------------------
+# LoRA 适配器配置
+# ------------------------------------------------------------
+lora:
+  # LoRA 秩（rank）：控制低秩矩阵的维度
+  # 推荐范围：8-64，越大表达能力越强但参数量越多
+  # 常用值：16（轻量）、32（平衡）、64（高表达力）
+  r: 32
+
+  # LoRA alpha：缩放系数，通常设为与 r 相同或2倍
+  # 实际缩放因子 = alpha / r，alpha=r 时缩放因子为1
+  alpha: 32
+
+  # LoRA dropout：正则化，训练时随机丢弃比例
+  # 推荐范围：0-0.1，数据量少时可适当增大防止过拟合
+  dropout: 0.0
+
+  # 目标模块：对哪些线性层应用 LoRA
+  # 以下为常见 Transformer 架构的投影层列表，全部应用可获得最佳效果
+  # 如显存不足可只保留 attention 层：["q_proj", "k_proj", "v_proj", "o_proj"]
+  target_modules:
+    - "q_proj"    # Query 投影
+    - "k_proj"    # Key 投影
+    - "v_proj"    # Value 投影
+    - "o_proj"    # Output 投影
+    - "gate_proj" # MLP 门控投影
+    - "up_proj"   # MLP 上投影
+    - "down_proj" # MLP 下投影
+
+# ------------------------------------------------------------
+# 训练配置
+# ------------------------------------------------------------
+training:
+  # 学习率：QLoRA 推荐范围 1e-5 ~ 2e-4
+  # 太大容易震荡/遗忘，太小收敛慢
+  learning_rate: 5.0e-5
+
+  # 每设备训练批大小：受显存限制
+  # RTX 2080 Ti (22GB) + 4-bit + seq_len=4096 时建议 1-2
+  per_device_train_batch_size: 2
+
+  # 梯度累积步数：有效批大小 = per_device_train_batch_size * gradient_accumulation_steps
+  # 有效批大小建议 8-16
+  gradient_accumulation_steps: 4
+
+  # 训练轮数：完整遍历数据集的次数
+  # 推荐范围：2-5，数据量少时可增大，注意配合验证集监控过拟合
+  num_epochs: 3
+
+  # 最大训练步数：可选的硬性上限
+  # 当同时设置 num_epochs 和 max_steps 时，以先达到的为准
+  # 设为 -1 表示不限制，完全由 num_epochs 控制（推荐）
+  # 对于初始小数据集调试，可设为具体数值（如 300）以快速验证
+  max_steps: -1
+
+  # 最大序列长度：输入 token 的最大长度
+  # Java 代码样本 + 工具调用链需要较长上下文
+  # 推荐范围：2048-8192，受显存限制
+  max_seq_length: 4096
+
+  # 预热步数：学习率从0线性增长到目标值的步数
+  # 推荐范围：总步数的 5%-10%
+  warmup_steps: 20
+
+  # 日志记录间隔（步）
+  logging_steps: 1
+
+  # 检查点保存间隔（步）
+  save_steps: 100
+
+  # 最多保留的检查点数量（节省磁盘空间）
+  save_total_limit: 3
+
+  # 优化器：adamw_8bit 节省显存，效果接近 adamw
+  # 可选值：adamw_8bit, adamw_torch, adamw_torch_fused, paged_adamw_8bit
+  optimizer: "adamw_8bit"
+
+  # 随机种子：确保训练可复现
+  seed: 3407
+
+  # 数据加载并行进程数
+  dataset_num_proc: 2
+
+  # 梯度检查点：用计算换显存，推荐开启
+  # 可选值：true, false, "unsloth"（Unsloth优化版本，推荐）
+  gradient_checkpointing: "unsloth"
+
+  # 实验名称：用于 TensorBoard 日志子目录命名
+  # 日志目录格式：{tensorboard_dir}/{experiment_name}_{时间戳}
+  # 例如：runs/train_20260419_143025
+  experiment_name: "train"
+
+  # 验证损失停滞警告阈值：连续多少个评估周期 val_loss 未下降时发出警告
+  # 仅在有验证集时生效；设为较大值可禁用
+  # 注意：此处以「评估周期」为单位（非 step），例如 eval_strategy=epoch 时 1 个周期 = 1 个 epoch
+  val_loss_stagnation_patience: 50
+
+# ------------------------------------------------------------
+# 数据配置
+# ------------------------------------------------------------
+data:
+  # 训练数据文件路径（merge 后的最终文件）
+  training_data_path: "training_data.jsonl"
+
+  # 种子样本目录（手写的高质量样本）
+  seeds_dir: "data/seeds"
+
+  # LLM 生成数据的输出目录
+  generated_dir: "data/generated"
+
+  # 总生成样本数（通过 LLM API 生成）
+  sample_count: 2000
+
+  # 各类别生成比例（总和应为1.0）
+  # 注意：未指定 --category 或 --categories 时，此处的 keys 决定默认生成的类型列表
+  category_ratios:
+    java_coding: 0.50       # Java 编程能力样本
+    tool_calling: 0.30      # 工具调用样本
+    param_reflection: 0.20  # 参数反思样本
+
+  # 样本类型定义目录：存放各类型的 YAML 定义文件
+  # 新增类型只需在此目录下创建对应的 .yaml 文件
+  categories_dir: "data/categories"
+
+  # 每次 LLM API 调用生成的样本数量（批量生成）
+  # 推荐范围：3-8，越大 API 调用次数越少但单次输出可能被截断
+  # 例如 batch_size=5 时，2000 条数据只需约 400 次 API 调用
+  batch_size: 5
+
+  # 去重相似度阈值（0.0-1.0）
+  # 合并数据时，字符级 n-gram Jaccard 相似度超过此阈值的样本视为重复
+  # 推荐范围：0.80-0.90，越高越宽松（保留更多相似样本）
+  dedup_similarity_threshold: 0.85
+
+  # 验证集划分比例：从训练数据中划出的验证集占比
+  # 推荐范围：0.05-0.15
+  validation_split_ratio: 0.10
+
+  # 划分随机种子（确保可复现）
+  split_seed: 42
+
+  # 被拒绝样本记录文件路径（人工审查时拒绝的样本会追加到此文件）
+  rejected_path: "rejected_samples.jsonl"
+
+  # 数据质量报告输出路径
+  report_path: "data_report.json"
+
+  # LLM API 配置（用于数据生成）
+  # 也可通过环境变量设置：LLM_API_BASE, LLM_API_KEY, LLM_MODEL
+  llm_api:
+    base_url: "https://api.openai.com/v1"
+    api_key: ""       # 建议通过环境变量 LLM_API_KEY 设置，避免泄露
+    model: "gpt-4o"   # 推荐使用高质量模型生成训练数据
+
+# ------------------------------------------------------------
+# 输出路径配置
+# ------------------------------------------------------------
+output:
+  # LoRA 适配器保存路径
+  adapter_dir: "lora_adapter"
+
+  # 合并后完整模型保存路径（较大，约18GB）
+  merged_dir: "merged_model"
+
+  # 训练检查点目录
+  checkpoint_dir: "outputs"
+
+  # TensorBoard 日志目录
+  tensorboard_dir: "runs"
+
+  # 实验记录目录
+  experiments_dir: "experiments"
+
+  # 是否在训练后自动合并 LoRA 到基础模型
+  # false=仅保存适配器（推荐日常训练），true=同时保存合并后模型
+  merge_model: false
+
+  # 合并方式：merged_16bit 或 merged_4bit
+  merge_method: "merged_16bit"
+
+# ------------------------------------------------------------
+# 早停配置
+# ------------------------------------------------------------
+early_stopping:
+  # 是否启用早停
+  enabled: true
+
+  # 耐心值：验证损失连续多少个评估周期不下降时停止
+  # 推荐范围：2-5
+  patience: 3
+
+  # 最小改善幅度：损失下降小于此值不算改善
+  # 推荐范围：0.0001-0.01
+  min_delta: 0.001
+
+# ------------------------------------------------------------
+# 多 LoRA 合并配置
+# ------------------------------------------------------------
+lora_merge:
+  # 合并方法
+  # 可选值：
+  #   linear     - 加权线性平均（最简单稳定）
+  #   ties       - TIES-Merging（稀疏化后合并，保留显著参数）
+  #   dare_ties  - DARE + TIES（随机丢弃 + TIES，更激进的稀疏化）
+  #   cat        - 拼接合并（增大适配器维度）
+  method: "linear"
+
+  # 待合并的适配器路径列表
+  adapters:
+    - "lora_adapter"
+    # - "lora_adapter_2"
+    # - "lora_adapter_3"
+
+  # 各适配器的合并权重（与 adapters 列表一一对应）
+  # 权重总和不必为1，会自动归一化
+  weights:
+    - 1.0
+    # - 0.5
+    # - 0.5
+
+  # TIES/DARE 稀疏化密度：保留参数的比例
+  # 仅在 method 为 ties 或 dare_ties 时生效
+  # 推荐范围：0.1-0.5
+  density: 0.5
+
+  # 合并后输出路径
+  output_path: "merged_lora"

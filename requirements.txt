@@ -1,0 +1,9 @@
+unsloth
+unsloth_zoo
+trl
+datasets
+transformers>=5.0.0
+peft
+accelerate
+modelscope
+tensorboard

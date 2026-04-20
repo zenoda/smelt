@@ -1,0 +1,66 @@
+# 工具调用样本类型定义
+name: tool_calling
+description: "工具调用 — 任务分解、步骤规划、严格工具调用合规"
+
+subcategories:
+  - simple_tool_call
+  - multi_step_planning
+  - tool_constraint
+  - error_recovery
+  - refusal_or_fallback
+
+# meta_prompt 模板
+# 支持占位符: {seed_example}, {difficulty_instruction}, {subcategory},
+#              {tool_definitions}, {extra_instruction}, {batch_size}
+meta_prompt: |
+  你是一位训练数据生成专家。你的任务是生成高质量的工具调用训练样本。
+
+  ## 要求
+
+  请生成 {batch_size} 条独立的训练样本，以 JSON 数组格式返回：
+  [
+    {{"messages": [...]}},
+    {{"messages": [...]}},
+    ...
+  ]
+  每条样本之间要有足够的差异性（不同的任务场景、不同的工具组合）。
+
+  ### 工具调用格式
+
+  {tool_definitions}
+
+  ### 场景类型
+  {extra_instruction}
+
+  ### 格式要求
+  1. 第一条消息必须是 system role，内容为：「你是一位智能编程助手，可以通过调用工具来帮助用户完成软件开发任务。处理复杂任务时，请先拆解为具体步骤，然后按顺序执行。」
+  2. 后续交替 user/assistant/user(tool_response)/assistant... 消息
+  3. assistant 消息中使用工具调用时，必须使用上述 CoPaw XML 格式
+  4. user 消息中的工具响应必须用 <tool_response>...</tool_response> 包裹
+  5. assistant 在调用工具前应简要说明意图
+  6. assistant 在获得工具响应后应总结结果
+  7. 使用中文
+
+  ### 子话题
+  本次请聚焦于：{subcategory}
+
+  ### 难度要求
+  {difficulty_instruction}
+
+  ## 参考示例
+
+  以下是同类别的一个参考样本，请生成【不同任务场景】但【同等质量和格式】的新样本：
+
+  {seed_example}
+
+  ## 输出
+
+  请直接输出一个合法的 JSON 数组，不要添加任何 markdown 代码块标记或其他说明文字。
+
+# 子话题的详细指令（可选）
+extra_instructions:
+  simple_tool_call: "简单工具调用：用户提出一个简单任务，assistant 调用 1 个工具即可完成。"
+  multi_step_planning: "多步骤任务规划：用户提出一个复杂任务，assistant 需要拆解为多个步骤，依次调用多个工具完成。"
+  tool_constraint: "工具约束遵守：用户的请求需要精确使用工具参数（如 edit_file 的 old_text 必须精确匹配）。"
+  error_recovery: "错误恢复链路：工具执行出错后，assistant 需要分析错误原因并修复重试。"
+  refusal_or_fallback: "拒绝或降级：用户的问题不需要工具调用（纯知识问答），或者用户的操作任务可以通过工具执行（如安装软件）。"

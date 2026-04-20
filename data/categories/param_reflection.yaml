@@ -1,0 +1,70 @@
+# 参数反思样本类型定义
+name: param_reflection
+description: "参数反思 — 类型校验、缺失检测、值合理性推理"
+
+subcategories:
+  - type_check
+  - required_check
+  - value_reasonableness
+  - tool_selection
+  - error_correction
+  - execution_impact
+
+# meta_prompt 模板
+# 支持占位符: {seed_example}, {difficulty_instruction}, {subcategory},
+#              {tool_definitions}, {extra_instruction}, {batch_size}
+meta_prompt: |
+  你是一位训练数据生成专家。你的任务是生成高质量的参数反思训练样本。
+
+  ## 目标
+
+  通过训练样本教会模型在调用工具前进行参数校验和推理思考。这类样本的核心特征是：
+  assistant 在执行工具调用前，先用自然语言说明工具参数要求和自己的参数选择理由。
+
+  请生成 {batch_size} 条独立的训练样本，以 JSON 数组格式返回：
+  [
+    {{"messages": [...]}},
+    {{"messages": [...]}},
+    ...
+  ]
+  每条样本之间要有足够的差异性（不同的反思角度、不同的工具使用场景）。
+
+  ### 工具调用格式
+
+  {tool_definitions}
+
+  ### 反思类型
+  {extra_instruction}
+
+  ### 格式要求
+  1. 第一条消息必须是 system role，内容为：「你是一位智能编程助手，可以通过调用工具来帮助用户完成软件开发任务。处理复杂任务时，请先拆解为具体步骤，然后按顺序执行。」
+  2. assistant 在调用工具前，必须先用 1-3 句话说明：
+     - 工具参数的类型/格式要求
+     - 自己为什么选择这些参数值
+     - 或者为什么选择这个工具而不是其他工具
+  3. 使用中文
+
+  ### 子话题
+  本次请聚焦于：{subcategory}
+
+  ### 难度要求
+  {difficulty_instruction}
+
+  ## 参考示例
+
+  以下是同类别的一个参考样本，请生成【不同任务场景】但【同等格式和反思深度】的新样本：
+
+  {seed_example}
+
+  ## 输出
+
+  请直接输出一个合法的 JSON 数组，不要添加任何 markdown 代码块标记或其他说明文字。
+
+# 子话题的详细指令（可选）
+extra_instructions:
+  type_check: "参数类型校验：assistant 在调用工具前说明参数的类型要求（如绝对路径 vs 相对路径）。"
+  required_check: "必填参数检查：assistant 在调用工具前确认所有必填参数已准备好。"
+  value_reasonableness: "参数值合理性：assistant 在调用工具前检查参数值是否合理（如正则表达式语法、路径中的空格处理）。"
+  tool_selection: "工具选择推理：assistant 解释为什么选择某个工具而不是其他工具。"
+  error_correction: "错误参数自纠正：assistant 发现上一步的参数有误，主动纠正并重新调用。"
+  execution_impact: "执行后果预估：assistant 在执行可能有副作用的命令前（如长时间运行的进程、数据库操作），先评估后果并说明策略。"

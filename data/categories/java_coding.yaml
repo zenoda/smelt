@@ -1,0 +1,76 @@
+# Java 编程样本类型定义
+name: java_coding
+description: "Java 编程 — Spring Boot/Cloud, MyBatis, Flyway, WebFlux, 异常诊断"
+
+subcategories:
+  - springboot_basics
+  - springboot_web
+  - spring_cloud
+  - mybatis
+  - flyway
+  - webflux
+  - exception_diagnosis
+  - code_review
+
+# meta_prompt 模板
+# 支持占位符: {seed_example}, {difficulty_instruction}, {subcategory},
+#              {tool_definitions}, {extra_instruction}, {batch_size}
+# 注意: 模板中的 JSON 花括号需要双写转义 {{ }}
+meta_prompt: |
+  你是一位训练数据生成专家。你的任务是生成高质量的 Java 编程训练样本。
+
+  ## 要求
+
+  请生成 {batch_size} 条独立的训练样本，以 JSON 数组格式返回：
+  [
+    {{"messages": [...]}},
+    {{"messages": [...]}},
+    ...
+  ]
+  每条样本之间要有足够的差异性（不同的问题场景、不同的技术细节）。
+
+  ### 话题范围
+  - Spring Boot 基础（自动装配、配置加载、Starter 开发、全局异常处理）
+  - Spring Boot Web 开发（RESTful API、参数校验、Filter/Interceptor、接口幂等性）
+  - Spring Cloud 微服务（Nacos、OpenFeign、Gateway、Sentinel）
+  - MyBatis（动态SQL、N+1问题、TypeHandler、分页插件）
+  - Flyway 数据库迁移（配置、命名规则、多数据源）
+  - WebFlux 响应式编程（Mono/Flux操作符、背压、R2DBC）
+  - 异常排查（循环依赖、连接池耗尽、OOM、MyBatis绑定异常）
+  - 代码审查（设计模式、重构建议）
+
+  ### 格式要求
+  1. 第一条消息必须是 system role，内容为：「你是一位资深Java开发工程师，精通Spring Boot、Spring Cloud、MyBatis、Flyway、WebFlux等框架。请用简洁准确的语言回答问题，代码示例要完整可运行。」
+  2. 后续交替 user 和 assistant 消息
+  3. assistant 回复应包含：清晰的概念解释、完整可运行的代码示例（用 ```java 代码块）、实践建议或注意事项
+  4. 代码示例要符合 Java 17+ / Spring Boot 3.x 规范
+  5. 使用中文
+
+  ### 难度要求
+  {difficulty_instruction}
+
+  ### 子话题
+  本次请聚焦于：{subcategory}
+  {extra_instruction}
+
+  ## 参考示例
+
+  以下是同类别的一个参考样本，请生成【不同话题】但【同等质量】的新样本：
+
+  {seed_example}
+
+  ## 输出
+
+  请直接输出一个合法的 JSON 数组，不要添加任何 markdown 代码块标记或其他说明文字。
+
+# 子话题的详细指令（可选）
+# key 为子话题名称，value 为补充说明文字
+extra_instructions:
+  springboot_basics: "重点关注自动装配、配置加载、Starter 开发、全局异常处理"
+  springboot_web: "重点关注 RESTful API、参数校验、Filter/Interceptor、接口幂等性"
+  spring_cloud: "重点关注 Nacos 配置/注册中心、OpenFeign 声明式调用、Gateway 路由/过滤、Sentinel 流控降级"
+  mybatis: "重点关注动态SQL、N+1问题、TypeHandler、分页插件"
+  flyway: "重点关注数据库迁移配置、命名规则、多数据源迁移"
+  webflux: "重点关注 Mono/Flux 操作符、背压机制、R2DBC 响应式数据库"
+  exception_diagnosis: "重点关注循环依赖、连接池耗尽、OOM、MyBatis 绑定异常等常见问题排查"
+  code_review: "重点关注设计模式应用、代码重构建议、性能优化"

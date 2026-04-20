@@ -1,0 +1,142 @@
+{
+  "project": "QLoRA Training Pipeline",
+  "branchName": "ralph/pluggable-sample-categories",
+  "description": "可插拔样本类型与批量数据生成 - 将样本类型定义外部化为 YAML, 支持一次 LLM 调用生成多条样本, CLI 支持多类型指定",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "创建样本类型 YAML 定义文件",
+      "description": "As a 训练工程师, I want 样本类型定义在独立的 YAML 文件中 so that 新增类型时不需要修改 Python 代码。",
+      "acceptanceCriteria": [
+        "创建 data/categories/ 目录",
+        "将 java_coding 类型从 generate_data.py 的 META_PROMPTS、SUBCATEGORIES、SCENARIO_INSTRUCTIONS 等硬编码常量提取为 data/categories/java_coding.yaml，包含 name、description、subcategories、meta_prompt、extra_instructions 字段",
+        "将 tool_calling 类型提取为 data/categories/tool_calling.yaml，结构同上",
+        "将 param_reflection 类型提取为 data/categories/param_reflection.yaml，结构同上",
+        "每个 YAML 的 meta_prompt 模板支持占位符：{seed_example}、{difficulty_instruction}、{subcategory}、{tool_definitions}、{extra_instruction}、{batch_size}",
+        "meta_prompt 模板要求 LLM 返回 JSON 数组格式 [{\"messages\": [...]}, ...] 而非单个对象",
+        "YAML 文件可被 Python yaml.safe_load() 正常解析"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "从 generate_data.py 第 1288-1441 行的硬编码常量提取。DIFFICULTY_LEVELS/DIFFICULTY_INSTRUCTIONS/TOOL_DEFINITIONS_TEXT 是跨类型共享的，保留在代码中不提取。"
+    },
+    {
+      "id": "US-002",
+      "title": "新增 load_categories() 动态加载函数",
+      "description": "As a 训练工程师, I want generate_data.py 在运行时动态发现和加载 data/categories/ 下的所有 YAML 文件 so that 类型注册是自动的。",
+      "acceptanceCriteria": [
+        "在 generate_data.py 中新增 load_categories(categories_dir) 函数，扫描目录下所有 .yaml 文件并用 yaml.safe_load() 解析",
+        "对每个 YAML 校验必填字段（name、subcategories、meta_prompt），缺少时 logger.error 并跳过该类型",
+        "返回 Dict[str, dict] 结构，key 为 YAML 文件名 stem（如 java_coding）",
+        "加载完成后日志输出发现的类型列表及各类型的子话题数量",
+        "categories_dir 默认值为 data/categories，后续通过 config.yaml 的 data.categories_dir 配置",
+        "Typecheck passes (python -c 'import generate_data')"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "此步骤只新增函数，不删除旧常量。删除旧常量在 US-003 中进行。"
+    },
+    {
+      "id": "US-003",
+      "title": "重构 _build_prompt() 使用动态类型定义",
+      "description": "As a 训练工程师, I want prompt 构建逻辑从动态加载的类型定义中读取模板和指令 so that 不再依赖硬编码分支。",
+      "acceptanceCriteria": [
+        "_build_prompt() 签名改为接收 category_def dict（而非 category 字符串），从中获取 meta_prompt 模板和 extra_instructions",
+        "删除 _build_prompt() 中 if category == 'java_coding' / 'tool_calling' / 'param_reflection' 的硬编码分支",
+        "模板格式化时 extra_instruction 从 category_def['extra_instructions'][subcategory] 查找，找不到时使用空字符串",
+        "tool_definitions 作为通用 kwarg 传入，模板中有 {tool_definitions} 占位符就填充",
+        "新增 {batch_size} 占位符支持",
+        "删除 VALID_CATEGORIES、META_PROMPTS、SUBCATEGORIES、SCENARIO_INSTRUCTIONS、REFLECTION_INSTRUCTIONS 硬编码常量",
+        "generate_via_llm() 中调用 _build_prompt() 的地方适配新签名",
+        "Typecheck passes (python -c 'import generate_data')"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "依赖 US-001（YAML 文件已创建）和 US-002（load_categories 函数可用）。这是核心重构步骤。"
+    },
+    {
+      "id": "US-004",
+      "title": "改造 _parse_llm_response() 支持批量 JSON 数组解析",
+      "description": "As a 训练工程师, I want _parse_llm_response() 能解析 JSON 数组 so that 一次 LLM 调用返回的多条样本都能被提取。",
+      "acceptanceCriteria": [
+        "_parse_llm_response() 返回类型从 Optional[Dict] 改为 List[Dict]",
+        "优先尝试解析 JSON 数组（查找 [...] 并 json.loads），数组中每个元素必须是含 messages 字段的 dict",
+        "如果解析出单个 dict（非数组），包装为 [dict] 返回，保持向后兼容",
+        "当 JSON 数组被截断时（解析失败），降级方案：用正则逐个提取 {\"messages\": [...]} 对象",
+        "解析失败时返回空列表 [] 而非 None",
+        "Typecheck passes (python -c 'import generate_data')"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "纯函数改造，不涉及 LLM 调用逻辑。generate_via_llm() 的适配在 US-005 中进行。"
+    },
+    {
+      "id": "US-005",
+      "title": "改造 generate_via_llm() 支持批量生成",
+      "description": "As a 训练工程师, I want 每次 LLM API 调用生成多条训练样本 so that API 调用次数大幅减少。",
+      "acceptanceCriteria": [
+        "generate_via_llm() 新增 batch_size 参数（默认 5）",
+        "主循环次数从 count 改为 math.ceil(count / batch_size)，当已收集有效样本数 >= count 时提前退出",
+        "每轮调用 _build_prompt() 时传入 batch_size，prompt 中要求 LLM 生成 batch_size 条样本",
+        "调用 _parse_llm_response() 后对返回列表中每条样本独立执行 validate_sample()，通过的加入结果集",
+        "LLM API 调用的 max_tokens 设为 min(batch_size * 4096, 16384)",
+        "日志输出：实际 API 调用次数、每批次成功/失败条数、总成功率",
+        "system prompt 改为要求返回 JSON 数组格式",
+        "Typecheck passes (python -c 'import generate_data')"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "依赖 US-003（_build_prompt 支持 batch_size）和 US-004（_parse_llm_response 支持数组）。"
+    },
+    {
+      "id": "US-006",
+      "title": "CLI 支持 --categories 多类型指定",
+      "description": "As a 训练工程师, I want 通过 CLI 参数一次指定多种样本类型 so that 可以灵活控制本次生成的类型范围。",
+      "acceptanceCriteria": [
+        "_parse_cli_args() 新增解析 --categories 参数（逗号分隔），存为 list",
+        "保留 --category 参数向后兼容，内部转换为单元素 categories 列表",
+        "--categories 和 --category 同时指定时 --categories 优先",
+        "新增解析 --batch-size 参数",
+        "main() 中验证指定的类型必须在 load_categories() 返回的类型中，否则报错并列出可用类型",
+        "未指定类型参数时从 config.yaml 的 data.category_ratios 的 keys 推导类型列表",
+        "多类型时按 category_ratios 比例分配各类型生成数量",
+        "main() 全流程适配：加载 categories、传递 batch_size、使用新的类型列表",
+        "Typecheck passes (python -c 'import generate_data')"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "依赖 US-002（load_categories）、US-003（_build_prompt 新签名）、US-005（generate_via_llm batch_size）。这是 main() 的整合步骤。"
+    },
+    {
+      "id": "US-007",
+      "title": "训练数据保留 category metadata",
+      "description": "As a 训练工程师, I want training_data.jsonl 保留样本的 category 信息 so that train.py 可以准确进行分层采样。",
+      "acceptanceCriteria": [
+        "generate_data.py 的 merge_all_data() 输出时保留 metadata 字段，格式为 {\"messages\": [...], \"metadata\": {\"category\": \"...\"}}（只保留 category，去掉 subcategory/difficulty/source）",
+        "merge_reviewed_data() 同样保留 metadata.category",
+        "train.py 的 load_and_split_data() 加载时保留 metadata 字段",
+        "train.py 的 _infer_category() 优先读取 sample.get('metadata', {}).get('category')，无 metadata 时回退到现有内容推断",
+        "train.py 的 format_dataset() 生成 HuggingFace Dataset 时只传入 messages（剥离 metadata），不影响 tokenization",
+        "Typecheck passes (python -c 'import train')"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "涉及 generate_data.py（merge 输出）和 train.py（数据加载+分层采样）两个文件。"
+    },
+    {
+      "id": "US-008",
+      "title": "更新配置文件",
+      "description": "As a 训练工程师, I want 新增的配置项反映在 config.yaml 和 config.example.yaml 中 so that 配置完整且有文档。",
+      "acceptanceCriteria": [
+        "config.yaml 的 data 部分新增 batch_size: 5，附中文注释说明作用和建议范围（3-8）",
+        "config.yaml 的 data 部分新增 categories_dir: \"data/categories\"，附中文注释",
+        "config.example.yaml 同步新增以上两个字段和注释",
+        "确认 category_ratios 的注释说明其同时决定了默认生成的类型列表",
+        "python -c \"from config_utils import load_config; cfg = load_config(); print(cfg)\" 正常执行不报错"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "简单配置变更，不影响其他脚本。"
+    }
+  ]
+}
