@@ -1,0 +1,138 @@
+{
+  "project": "QLoRA Training Pipeline",
+  "branchName": "ralph/tool-calling-optimization",
+  "description": "优化 tool_calling 训练数据：扩展工具定义对齐 opencode、增强 meta_prompt 和 subcategory、补充 seed 样本，让模型更积极调用工具并严格遵守参数规范",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "generate_data.py 支持 YAML 级别工具定义覆盖",
+      "description": "As a 训练工程师, I want _build_prompt() 优先从 category YAML 读取 tool_definitions so that 各 category 可独立配置工具列表。",
+      "acceptanceCriteria": [
+        "_build_prompt() 函数中 tool_definitions 取值改为: category_def.get('tool_definitions', TOOL_DEFINITIONS_TEXT)",
+        "param_reflection.yaml 和 java_coding.yaml 不含 tool_definitions 字段时，自动 fallback 到全局 TOOL_DEFINITIONS_TEXT",
+        "全局 TOOL_DEFINITIONS_TEXT 常量保持不变",
+        "python -c \"import generate_data\" 不报错"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "仅改动 _build_prompt() 中约第 1465 行的一行代码。这是后续 US-002 的前置依赖。"
+    },
+    {
+      "id": "US-002",
+      "title": "tool_calling.yaml 新增 tool_definitions 字段",
+      "description": "As a 训练工程师, I want tool_calling.yaml 包含 10 个对齐 opencode 的完整工具定义 so that 生成的训练数据中工具参数约束准确。",
+      "acceptanceCriteria": [
+        "tool_calling.yaml 新增 tool_definitions 字段（YAML 多行字符串 | 形式）",
+        "包含 10 个工具定义：read_file, write_file, edit_file, search_files, find_files, run_command, list_dir, todo_write, ask_user, launch_agent",
+        "每个工具包含：函数签名（标注必填/可选参数及类型）、功能描述、使用规范",
+        "read_file 约束：path 必须绝对路径、默认最多 2000 行、编辑前必须先读取",
+        "edit_file 约束：old_text 必须完全匹配含缩进、多处匹配需加上下文、使用前必须先 read_file",
+        "run_command 约束：仅用于终端操作不用于文件读写搜索、避免 cd && cmd 用 workdir、description 必填",
+        "todo_write 约束：3+ 步骤任务必用、同时仅 1 个 in_progress、完成立即标记 completed",
+        "launch_agent 约束：仅用于开放性代码库探索、已知文件用 read_file",
+        "python -c \"import yaml; yaml.safe_load(open('data/categories/tool_calling.yaml'))\" 不报错"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "tool_definitions 字段不需要双写转义花括号，因为它作为完整字符串值被注入 meta_prompt，不经过 .format() 处理。10 个工具对应 opencode 的映射：read_file→read, write_file→write, edit_file→edit, search_files→grep, find_files→glob, run_command→bash, list_dir→list, todo_write→todowrite, ask_user→question, launch_agent→task。"
+    },
+    {
+      "id": "US-003",
+      "title": "tool_calling.yaml 扩展 subcategories 和 extra_instructions",
+      "description": "As a 训练工程师, I want subcategories 从 5 个扩展到 8 个 so that 训练数据覆盖积极调用、并行调用、任务管理等关键行为模式。",
+      "acceptanceCriteria": [
+        "subcategories 列表包含 8 项：simple_tool_call, multi_step_planning, tool_constraint, error_recovery, refusal_or_fallback, proactive_tool_use, parallel_tool_calls, task_management",
+        "保留原有 5 个 subcategory 的 extra_instructions 内容（可微调措辞但语义不变）",
+        "新增 proactive_tool_use 的 extra_instruction：强调不猜测不假设、编辑前先读取、执行后验证、信息不够继续调工具",
+        "新增 parallel_tool_calls 的 extra_instruction：强调无依赖时并行、同一消息多个 tool_call 块、有依赖必须串行",
+        "新增 task_management 的 extra_instruction：强调 3+ 步骤必用 todo_write、同时仅 1 个 in_progress、完成立即标记",
+        "python -c \"import yaml; d=yaml.safe_load(open('data/categories/tool_calling.yaml')); assert len(d['subcategories'])==8\" 不报错"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "依赖 US-002（YAML 文件结构已就绪）。新增的 subcategory 会自动参与 generate_via_llm() 的 round-robin 轮转。"
+    },
+    {
+      "id": "US-004",
+      "title": "tool_calling.yaml 增强 meta_prompt",
+      "description": "As a 训练工程师, I want meta_prompt 中的 system prompt 和行为要求更完善 so that LLM 生成的样本体现正确的工具使用行为。",
+      "acceptanceCriteria": [
+        "system prompt 从一句话扩展为包含 7 条工具使用策略的完整指令：(1)需要信息时立即调用工具不猜测 (2)编辑前先read_file (3)文件操作优先专用工具 (4)独立调用可并行 (5)复杂任务先todo_write (6)避免cd&&用workdir (7)出错时分析修复",
+        "meta_prompt 新增「核心行为模式」章节，列出 5 个行为：积极调用、参数精确、验证闭环、错误不放过、专用工具优先",
+        "格式要求第 6 条改为「assistant 在获得工具响应后应总结结果并决定下一步」",
+        "meta_prompt 中 JSON 花括号正确双写转义（{{ 和 }}）",
+        "python -c \"import yaml; d=yaml.safe_load(open('data/categories/tool_calling.yaml')); d['meta_prompt'].format(seed_example='x',difficulty_instruction='x',subcategory='x',tool_definitions='x',extra_instruction='x',batch_size=1)\" 不报错"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "依赖 US-002 和 US-003（YAML 的其他字段已就绪）。meta_prompt 是最复杂的部分，必须确保 .format() 模板渲染正确。"
+    },
+    {
+      "id": "US-005",
+      "title": "补充 proactive_tool_use seed 样本（2 条）",
+      "description": "As a 训练工程师, I want proactive_tool_use subcategory 有高质量 seed 样本 so that LLM 生成时有正确的行为参考。",
+      "acceptanceCriteria": [
+        "在 data/seeds/tool_calling.jsonl 末尾追加 2 条新样本",
+        "样本 11：subcategory=proactive_tool_use, difficulty=intermediate, 场景为重构 OrderService（先 read_file 查看 → search_files 找引用 → edit_file 重构 → run_command 编译验证）",
+        "样本 12：subcategory=proactive_tool_use, difficulty=advanced, 场景为排查编译错误（立刻 run_command 编译 → read_file 查看报错文件 → 不假设原因每个都查源码）",
+        "两条样本均展示「不猜测→先查看→再行动→后验证」的完整链路",
+        "edit_file 之前必有对应文件的 read_file",
+        "工具参数使用绝对路径，run_command 包含 description 参数",
+        "使用增强后的 system prompt（包含工具使用策略）",
+        "每条是合法单行 JSON，python -c \"import json; [json.loads(l) for l in open('data/seeds/tool_calling.jsonl')]\" 不报错"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Java/Spring Boot 场景。CoPaw XML 格式。metadata 含 category/subcategory/difficulty。"
+    },
+    {
+      "id": "US-006",
+      "title": "补充 parallel_tool_calls seed 样本（2 条）",
+      "description": "As a 训练工程师, I want parallel_tool_calls subcategory 有高质量 seed 样本 so that LLM 生成时学会在同一消息中并行发起多个工具调用。",
+      "acceptanceCriteria": [
+        "在 data/seeds/tool_calling.jsonl 末尾追加 2 条新样本",
+        "样本 13：subcategory=parallel_tool_calls, difficulty=intermediate, 场景为了解项目结构（同时 3 个并行 tool_call：list_dir + find_files + read_file）",
+        "样本 14：subcategory=parallel_tool_calls, difficulty=basic, 场景为对比 dev/prod 配置（同时 2 个并行 read_file）",
+        "并行调用样本中，单条 assistant 消息包含多个 <tool_call> 块",
+        "对应的 user 消息包含多个 <tool_response> 块，用换行分隔",
+        "每条是合法单行 JSON，python -c \"import json; [json.loads(l) for l in open('data/seeds/tool_calling.jsonl')]\" 不报错"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "这是训练数据中首次出现并行调用模式的 seed 样本，需要特别注意 XML 格式的正确性。"
+    },
+    {
+      "id": "US-007",
+      "title": "补充 task_management seed 样本（2 条）",
+      "description": "As a 训练工程师, I want task_management subcategory 有高质量 seed 样本 so that LLM 生成时学会用 todo_write 进行任务规划和进度跟踪。",
+      "acceptanceCriteria": [
+        "在 data/seeds/tool_calling.jsonl 末尾追加 2 条新样本",
+        "样本 15：subcategory=task_management, difficulty=advanced, 场景为添加 Swagger+参数校验+全局异常处理（先 todo_write 创建 3 个 pending 任务 → 逐个 in_progress → 执行 → completed）",
+        "样本 16：subcategory=task_management, difficulty=intermediate, 场景为修复 3 个编译错误（todo_write 创建 → 逐个修复 → 最后 run_command 验证全部通过）",
+        "每条样本包含至少 2 次 todo_write 调用（创建 + 至少一次状态更新）",
+        "todo_write 参数格式正确：todos 列表每项含 content/status/priority",
+        "每条是合法单行 JSON，python -c \"import json; [json.loads(l) for l in open('data/seeds/tool_calling.jsonl')]\" 不报错"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "todo_write 的 tool_response 建议返回 JSON 格式的 todo 列表快照。"
+    },
+    {
+      "id": "US-008",
+      "title": "补充 tool_constraint 和 multi_step_planning seed 样本（各 1 条）",
+      "description": "As a 训练工程师, I want 原有 subcategory 也有新的 seed 样本展示更严格的工具使用规范 so that 整体样本质量提升。",
+      "acceptanceCriteria": [
+        "在 data/seeds/tool_calling.jsonl 末尾追加 2 条新样本",
+        "样本 17：subcategory=tool_constraint, difficulty=advanced, 场景为修改 UserService 返回 Optional（edit_file 首次 old_text 缩进不对失败 → 重新 read_file 确认 → 修正后重试成功）",
+        "样本 18：subcategory=multi_step_planning, difficulty=advanced, 场景为添加带分页的查询接口（find_files → read_file → edit_file(Mapper) → edit_file(Service) → edit_file(Controller) → run_command 验证）",
+        "样本 17 必须包含工具调用失败和重试的完整链路",
+        "样本 18 的工具调用次数 >= 5",
+        "每条是合法单行 JSON，python -c \"import json; [json.loads(l) for l in open('data/seeds/tool_calling.jsonl')]\" 不报错",
+        "最终 tool_calling.jsonl 总计 18 条样本，覆盖全部 8 个 subcategory"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "这两条样本与原有 seed 的场景和展示行为有明显区别：17 侧重失败重试，18 侧重长链路多文件编辑。"
+    }
+  ]
+}

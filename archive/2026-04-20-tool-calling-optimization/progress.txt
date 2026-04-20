@@ -1,0 +1,27 @@
+## Codebase Patterns
+- `_build_prompt()` 中的 `tool_definitions` 现在优先从 category YAML 读取，fallback 到全局 `TOOL_DEFINITIONS_TEXT`
+- `tool_definitions` 字段在 YAML 中不需要双写花括号转义，因为它作为完整字符串注入 meta_prompt，不经过 `.format()` 处理
+- `meta_prompt` 中的 JSON 花括号必须双写转义（`{{` 和 `}}`），否则 Python `.format()` 报 KeyError
+- 新增 subcategory 会自动参与 `generate_via_llm()` 的 round-robin 轮转
+- seed 样本必须是单行合法 JSON，每条用 `\n` 分隔
+- 并行工具调用样本中，assistant 消息的多个 `<tool_call>` 块之间用 `\n\n` 分隔
+- 对应的 user 消息中包含多个 `<tool_response>` 块，用 `\n\n` 分隔
+- `todo_write` 的 tool_response 返回 JSON 格式的 todo 列表快照
+---
+
+## 2026-04-20 - US-001 ~ US-008
+- **US-001**: `generate_data.py` 第 1465 行改为 `category_def.get("tool_definitions", TOOL_DEFINITIONS_TEXT)`，支持 YAML 级别工具定义覆盖
+- **US-002**: `tool_calling.yaml` 新增 `tool_definitions` 字段，包含 10 个对齐 opencode 的工具定义（read_file, write_file, edit_file, search_files, find_files, run_command, list_dir, todo_write, ask_user, launch_agent）
+- **US-003**: subcategories 从 5 个扩展到 8 个（新增 proactive_tool_use, parallel_tool_calls, task_management），extra_instructions 也相应扩展
+- **US-004**: meta_prompt 增强：system prompt 包含 7 条工具使用策略，新增"核心行为模式"章节（5 个行为），格式要求第 6 条改为"总结结果并决定下一步"
+- **US-005**: 追加 2 条 proactive_tool_use seed 样本（样本 11-12），展示不猜测→先查看→再行动→后验证的完整链路
+- **US-006**: 追加 2 条 parallel_tool_calls seed 样本（样本 13-14），单条 assistant 消息包含多个 tool_call 块
+- **US-007**: 追加 2 条 task_management seed 样本（样本 15-16），每条包含多次 todo_write 调用
+- **US-008**: 追加 2 条样本（样本 17-18），tool_constraint 展示 edit_file 失败重试，multi_step_planning 展示 5+ 步骤长链路
+- Files changed: `generate_data.py`, `data/categories/tool_calling.yaml`, `data/seeds/tool_calling.jsonl`, `prd.json`
+- **Learnings for future iterations:**
+  - tool_calling.yaml 的 meta_prompt 是最复杂的部分，修改后必须验证 `.format()` 不报错
+  - seed 样本写完后用 `python -c "import json; [json.loads(l) for l in open('...')]"` 验证 JSON 合法性
+  - edit_file 的 old_text 缩进必须精确匹配，这个约束在 seed 样本中也要体现
+  - 并行调用的 tool_response 格式：多个 `<tool_response>` 块用 `\n\n` 分隔
+---

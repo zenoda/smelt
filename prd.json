@@ -1,138 +1,227 @@
 {
-  "project": "QLoRA Training Pipeline",
-  "branchName": "ralph/tool-calling-optimization",
-  "description": "优化 tool_calling 训练数据：扩展工具定义对齐 opencode、增强 meta_prompt 和 subcategory、补充 seed 样本，让模型更积极调用工具并严格遵守参数规范",
+  "project": "CoPaw Training Pipeline",
+  "branchName": "ralph/replace-param-reflection-with-frontend-dev",
+  "description": "删除 param_reflection 样本类型，新增 frontend_dev 前端开发样本类型（Vue3/TypeScript/ElementPlus），保持 50%/30%/20% 训练比例",
   "userStories": [
     {
       "id": "US-001",
-      "title": "generate_data.py 支持 YAML 级别工具定义覆盖",
-      "description": "As a 训练工程师, I want _build_prompt() 优先从 category YAML 读取 tool_definitions so that 各 category 可独立配置工具列表。",
+      "title": "创建 frontend_dev 类型定义 YAML 文件",
+      "description": "作为数据生成流程，我需要 data/categories/frontend_dev.yaml 定义文件，以便 load_categories() 能自动加载前端开发样本类型。",
       "acceptanceCriteria": [
-        "_build_prompt() 函数中 tool_definitions 取值改为: category_def.get('tool_definitions', TOOL_DEFINITIONS_TEXT)",
-        "param_reflection.yaml 和 java_coding.yaml 不含 tool_definitions 字段时，自动 fallback 到全局 TOOL_DEFINITIONS_TEXT",
-        "全局 TOOL_DEFINITIONS_TEXT 常量保持不变",
-        "python -c \"import generate_data\" 不报错"
+        "创建 data/categories/frontend_dev.yaml，结构与 java_coding.yaml 一致",
+        "name 字段为 frontend_dev",
+        "description 字段为 '前端开发 — Vue3、ElementPlus、TypeScript、CSS、axios'",
+        "包含 8 个子类别：vue3_basics、vue3_components、element_plus、typescript_vue、axios_http、css_layout、state_management、frontend_engineering",
+        "meta_prompt 模板包含占位符：{seed_example}、{difficulty_instruction}、{subcategory}、{tool_definitions}、{extra_instruction}、{batch_size}",
+        "meta_prompt 中 system 角色提示词为：'你是一位资深前端开发工程师，精通 Vue3、TypeScript、ElementPlus、axios、CSS 等技术栈。请用简洁准确的语言回答问题，代码示例要完整可运行。'",
+        "meta_prompt 中的格式要求明确：Vue3 Composition API（<script setup lang=\"ts\">）、TypeScript 类型标注、ElementPlus 组件",
+        "extra_instructions 为每个子类别提供详细聚焦指令",
+        "YAML 格式合法，可被 generate_data.py 的 load_categories() 正确解析",
+        "python -c \"from generate_data import load_categories; cats=load_categories(); assert 'frontend_dev' in [c['name'] for c in cats]\" 执行成功"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "仅改动 _build_prompt() 中约第 1465 行的一行代码。这是后续 US-002 的前置依赖。"
+      "passes": true,
+      "notes": "参考 data/categories/java_coding.yaml 的结构。meta_prompt 中保留 {tool_definitions} 占位符以兼容通用渲染流程，但前端开发类型通常不需要工具定义。"
     },
     {
       "id": "US-002",
-      "title": "tool_calling.yaml 新增 tool_definitions 字段",
-      "description": "As a 训练工程师, I want tool_calling.yaml 包含 10 个对齐 opencode 的完整工具定义 so that 生成的训练数据中工具参数约束准确。",
+      "title": "创建 frontend_dev 种子数据（第 1 批：vue3_basics、vue3_components、element_plus）",
+      "description": "作为数据生成流程，我需要 data/seeds/frontend_dev.jsonl 的第一批种子样本，覆盖 vue3_basics(3条)、vue3_components(3条)、element_plus(3条)。",
       "acceptanceCriteria": [
-        "tool_calling.yaml 新增 tool_definitions 字段（YAML 多行字符串 | 形式）",
-        "包含 10 个工具定义：read_file, write_file, edit_file, search_files, find_files, run_command, list_dir, todo_write, ask_user, launch_agent",
-        "每个工具包含：函数签名（标注必填/可选参数及类型）、功能描述、使用规范",
-        "read_file 约束：path 必须绝对路径、默认最多 2000 行、编辑前必须先读取",
-        "edit_file 约束：old_text 必须完全匹配含缩进、多处匹配需加上下文、使用前必须先 read_file",
-        "run_command 约束：仅用于终端操作不用于文件读写搜索、避免 cd && cmd 用 workdir、description 必填",
-        "todo_write 约束：3+ 步骤任务必用、同时仅 1 个 in_progress、完成立即标记 completed",
-        "launch_agent 约束：仅用于开放性代码库探索、已知文件用 read_file",
-        "python -c \"import yaml; yaml.safe_load(open('data/categories/tool_calling.yaml'))\" 不报错"
+        "创建 data/seeds/frontend_dev.jsonl，每行一个 JSON 对象",
+        "本批包含 9 条样本：vue3_basics 3条、vue3_components 3条、element_plus 3条",
+        "每条格式：{\"messages\": [...], \"metadata\": {\"category\": \"frontend_dev\", \"subcategory\": \"xxx\", \"difficulty\": \"basic|intermediate|advanced\"}}",
+        "messages 数组第一条为 system role，内容为 YAML 中定义的 system 提示词",
+        "assistant 回复包含完整可运行的代码示例（使用 ```vue、```typescript 等代码块）",
+        "代码示例遵循 Vue3 Composition API + TypeScript 规范",
+        "vue3_basics 难度分布：1 basic + 2 intermediate",
+        "vue3_components 难度分布：2 intermediate + 1 advanced",
+        "element_plus 难度分布：1 basic + 2 intermediate",
+        "python -c \"import json; [json.loads(l) for l in open('data/seeds/frontend_dev.jsonl')]\" 执行成功"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "tool_definitions 字段不需要双写转义花括号，因为它作为完整字符串值被注入 meta_prompt，不经过 .format() 处理。10 个工具对应 opencode 的映射：read_file→read, write_file→write, edit_file→edit, search_files→grep, find_files→glob, run_command→bash, list_dir→list, todo_write→todowrite, ask_user→question, launch_agent→task。"
+      "passes": true,
+      "notes": "种子样本直接手写 JSONL，不从 generate_data.py 提取。代码示例要完整可运行。"
     },
     {
       "id": "US-003",
-      "title": "tool_calling.yaml 扩展 subcategories 和 extra_instructions",
-      "description": "As a 训练工程师, I want subcategories 从 5 个扩展到 8 个 so that 训练数据覆盖积极调用、并行调用、任务管理等关键行为模式。",
+      "title": "创建 frontend_dev 种子数据（第 2 批：typescript_vue、axios_http、css_layout）",
+      "description": "作为数据生成流程，我需要向 data/seeds/frontend_dev.jsonl 追加第二批种子样本，覆盖 typescript_vue(2条)、axios_http(2条)、css_layout(2条)。",
       "acceptanceCriteria": [
-        "subcategories 列表包含 8 项：simple_tool_call, multi_step_planning, tool_constraint, error_recovery, refusal_or_fallback, proactive_tool_use, parallel_tool_calls, task_management",
-        "保留原有 5 个 subcategory 的 extra_instructions 内容（可微调措辞但语义不变）",
-        "新增 proactive_tool_use 的 extra_instruction：强调不猜测不假设、编辑前先读取、执行后验证、信息不够继续调工具",
-        "新增 parallel_tool_calls 的 extra_instruction：强调无依赖时并行、同一消息多个 tool_call 块、有依赖必须串行",
-        "新增 task_management 的 extra_instruction：强调 3+ 步骤必用 todo_write、同时仅 1 个 in_progress、完成立即标记",
-        "python -c \"import yaml; d=yaml.safe_load(open('data/categories/tool_calling.yaml')); assert len(d['subcategories'])==8\" 不报错"
+        "向 data/seeds/frontend_dev.jsonl 追加 6 条样本",
+        "typescript_vue 2条：1 intermediate + 1 advanced",
+        "axios_http 2条：2 intermediate",
+        "css_layout 2条：1 basic + 1 intermediate",
+        "格式与第 1 批一致：messages + metadata 结构",
+        "assistant 回复包含完整可运行的代码示例",
+        "追加后文件总行数为 15",
+        "python -c \"import json; lines=[json.loads(l) for l in open('data/seeds/frontend_dev.jsonl')]; assert len(lines)==15\" 执行成功"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "依赖 US-002（YAML 文件结构已就绪）。新增的 subcategory 会自动参与 generate_via_llm() 的 round-robin 轮转。"
+      "passes": true,
+      "notes": "追加到现有文件末尾，不要覆盖第 1 批数据。"
     },
     {
       "id": "US-004",
-      "title": "tool_calling.yaml 增强 meta_prompt",
-      "description": "As a 训练工程师, I want meta_prompt 中的 system prompt 和行为要求更完善 so that LLM 生成的样本体现正确的工具使用行为。",
+      "title": "创建 frontend_dev 种子数据（第 3 批：state_management、frontend_engineering）",
+      "description": "作为数据生成流程，我需要向 data/seeds/frontend_dev.jsonl 追加最后一批种子样本，覆盖 state_management(2条)、frontend_engineering(2条)。",
       "acceptanceCriteria": [
-        "system prompt 从一句话扩展为包含 7 条工具使用策略的完整指令：(1)需要信息时立即调用工具不猜测 (2)编辑前先read_file (3)文件操作优先专用工具 (4)独立调用可并行 (5)复杂任务先todo_write (6)避免cd&&用workdir (7)出错时分析修复",
-        "meta_prompt 新增「核心行为模式」章节，列出 5 个行为：积极调用、参数精确、验证闭环、错误不放过、专用工具优先",
-        "格式要求第 6 条改为「assistant 在获得工具响应后应总结结果并决定下一步」",
-        "meta_prompt 中 JSON 花括号正确双写转义（{{ 和 }}）",
-        "python -c \"import yaml; d=yaml.safe_load(open('data/categories/tool_calling.yaml')); d['meta_prompt'].format(seed_example='x',difficulty_instruction='x',subcategory='x',tool_definitions='x',extra_instruction='x',batch_size=1)\" 不报错"
+        "向 data/seeds/frontend_dev.jsonl 追加 4 条样本",
+        "state_management 2条：2 intermediate",
+        "frontend_engineering 2条：2 advanced",
+        "格式与前两批一致",
+        "追加后文件总行数为 19",
+        "全部 8 个子类别均有覆盖",
+        "难度分布：basic 约 30%、intermediate 约 50%、advanced 约 20%（允许小幅偏差）",
+        "python -c \"import json; lines=[json.loads(l) for l in open('data/seeds/frontend_dev.jsonl')]; subs=set(l['metadata']['subcategory'] for l in lines); assert len(subs)==8, f'只有{len(subs)}个子类别'; assert len(lines)==19\" 执行成功"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "依赖 US-002 和 US-003（YAML 的其他字段已就绪）。meta_prompt 是最复杂的部分，必须确保 .format() 模板渲染正确。"
+      "passes": true,
+      "notes": "追加到现有文件末尾。完成后种子数据共 19 条，覆盖全部子类别。"
     },
     {
       "id": "US-005",
-      "title": "补充 proactive_tool_use seed 样本（2 条）",
-      "description": "As a 训练工程师, I want proactive_tool_use subcategory 有高质量 seed 样本 so that LLM 生成时有正确的行为参考。",
+      "title": "删除 param_reflection 类型定义和种子数据文件",
+      "description": "作为维护者，我需要移除 param_reflection 的数据文件，避免遗留无用文件。",
       "acceptanceCriteria": [
-        "在 data/seeds/tool_calling.jsonl 末尾追加 2 条新样本",
-        "样本 11：subcategory=proactive_tool_use, difficulty=intermediate, 场景为重构 OrderService（先 read_file 查看 → search_files 找引用 → edit_file 重构 → run_command 编译验证）",
-        "样本 12：subcategory=proactive_tool_use, difficulty=advanced, 场景为排查编译错误（立刻 run_command 编译 → read_file 查看报错文件 → 不假设原因每个都查源码）",
-        "两条样本均展示「不猜测→先查看→再行动→后验证」的完整链路",
-        "edit_file 之前必有对应文件的 read_file",
-        "工具参数使用绝对路径，run_command 包含 description 参数",
-        "使用增强后的 system prompt（包含工具使用策略）",
-        "每条是合法单行 JSON，python -c \"import json; [json.loads(l) for l in open('data/seeds/tool_calling.jsonl')]\" 不报错"
+        "删除 data/categories/param_reflection.yaml",
+        "删除 data/seeds/param_reflection.jsonl",
+        "data/categories/ 目录下只剩 java_coding.yaml、tool_calling.yaml、frontend_dev.yaml",
+        "data/seeds/ 目录下只剩 java_coding.jsonl、tool_calling.jsonl、frontend_dev.jsonl",
+        "ls data/categories/ 和 ls data/seeds/ 验证通过"
       ],
       "priority": 5,
       "passes": false,
-      "notes": "Java/Spring Boot 场景。CoPaw XML 格式。metadata 含 category/subcategory/difficulty。"
+      "notes": ""
     },
     {
       "id": "US-006",
-      "title": "补充 parallel_tool_calls seed 样本（2 条）",
-      "description": "As a 训练工程师, I want parallel_tool_calls subcategory 有高质量 seed 样本 so that LLM 生成时学会在同一消息中并行发起多个工具调用。",
+      "title": "更新配置文件中的类别比例",
+      "description": "作为数据生成流程，我需要 config/config.yaml 和 config/config.example.yaml 中的 category_ratios 反映新的类型列表。",
       "acceptanceCriteria": [
-        "在 data/seeds/tool_calling.jsonl 末尾追加 2 条新样本",
-        "样本 13：subcategory=parallel_tool_calls, difficulty=intermediate, 场景为了解项目结构（同时 3 个并行 tool_call：list_dir + find_files + read_file）",
-        "样本 14：subcategory=parallel_tool_calls, difficulty=basic, 场景为对比 dev/prod 配置（同时 2 个并行 read_file）",
-        "并行调用样本中，单条 assistant 消息包含多个 <tool_call> 块",
-        "对应的 user 消息包含多个 <tool_response> 块，用换行分隔",
-        "每条是合法单行 JSON，python -c \"import json; [json.loads(l) for l in open('data/seeds/tool_calling.jsonl')]\" 不报错"
+        "config/config.yaml 中 data.category_ratios 更新为：java_coding: 0.50、tool_calling: 0.30、frontend_dev: 0.20",
+        "config/config.example.yaml 中同步更新",
+        "移除 param_reflection 相关注释",
+        "新增 frontend_dev 的中文注释：# 前端开发样本",
+        "两个文件中 category_ratios 的值总和为 1.0",
+        "python -c \"import yaml; c=yaml.safe_load(open('config/config.yaml')); r=c['data']['category_ratios']; assert abs(sum(r.values())-1.0)<0.01 and 'frontend_dev' in r and 'param_reflection' not in r\" 执行成功"
       ],
       "priority": 6,
       "passes": false,
-      "notes": "这是训练数据中首次出现并行调用模式的 seed 样本，需要特别注意 XML 格式的正确性。"
+      "notes": ""
     },
     {
       "id": "US-007",
-      "title": "补充 task_management seed 样本（2 条）",
-      "description": "As a 训练工程师, I want task_management subcategory 有高质量 seed 样本 so that LLM 生成时学会用 todo_write 进行任务规划和进度跟踪。",
+      "title": "更新 generate_data.py 中的硬编码默认比例",
+      "description": "作为数据生成脚本，generate_data.py 中的硬编码默认 category_ratios 需要同步更新。",
       "acceptanceCriteria": [
-        "在 data/seeds/tool_calling.jsonl 末尾追加 2 条新样本",
-        "样本 15：subcategory=task_management, difficulty=advanced, 场景为添加 Swagger+参数校验+全局异常处理（先 todo_write 创建 3 个 pending 任务 → 逐个 in_progress → 执行 → completed）",
-        "样本 16：subcategory=task_management, difficulty=intermediate, 场景为修复 3 个编译错误（todo_write 创建 → 逐个修复 → 最后 run_command 验证全部通过）",
-        "每条样本包含至少 2 次 todo_write 调用（创建 + 至少一次状态更新）",
-        "todo_write 参数格式正确：todos 列表每项含 content/status/priority",
-        "每条是合法单行 JSON，python -c \"import json; [json.loads(l) for l in open('data/seeds/tool_calling.jsonl')]\" 不报错"
+        "--merge 模式默认比例：param_reflection: 0.20 改为 frontend_dev: 0.20",
+        "LLM 生成模式默认比例：同上",
+        "load_seeds() 函数文档注释中如有 param_reflection 示例，更新为 frontend_dev",
+        "grep -n param_reflection generate_data.py 返回空结果",
+        "python -c \"import generate_data\" 不报错"
       ],
       "priority": 7,
       "passes": false,
-      "notes": "todo_write 的 tool_response 建议返回 JSON 格式的 todo 列表快照。"
+      "notes": "全文搜索 param_reflection 确保无遗漏，注意检查注释和文档字符串。"
     },
     {
       "id": "US-008",
-      "title": "补充 tool_constraint 和 multi_step_planning seed 样本（各 1 条）",
-      "description": "As a 训练工程师, I want 原有 subcategory 也有新的 seed 样本展示更严格的工具使用规范 so that 整体样本质量提升。",
+      "title": "更新 train.py 中的类别推断逻辑",
+      "description": "作为训练流程，train.py 的 _infer_category() 函数需要能正确推断 frontend_dev 类型。",
       "acceptanceCriteria": [
-        "在 data/seeds/tool_calling.jsonl 末尾追加 2 条新样本",
-        "样本 17：subcategory=tool_constraint, difficulty=advanced, 场景为修改 UserService 返回 Optional（edit_file 首次 old_text 缩进不对失败 → 重新 read_file 确认 → 修正后重试成功）",
-        "样本 18：subcategory=multi_step_planning, difficulty=advanced, 场景为添加带分页的查询接口（find_files → read_file → edit_file(Mapper) → edit_file(Service) → edit_file(Controller) → run_command 验证）",
-        "样本 17 必须包含工具调用失败和重试的完整链路",
-        "样本 18 的工具调用次数 >= 5",
-        "每条是合法单行 JSON，python -c \"import json; [json.loads(l) for l in open('data/seeds/tool_calling.jsonl')]\" 不报错",
-        "最终 tool_calling.jsonl 总计 18 条样本，覆盖全部 8 个 subcategory"
+        "删除 _infer_category() 中 param_reflection 的关键词推断逻辑（param_keywords 检测段）",
+        "新增 frontend_dev 内容推断逻辑：检测关键词 Vue、ElementPlus、Element Plus、前端、组件、Composition API、Pinia、Vite 等",
+        "推断优先级：metadata.category > 工具调用检测 > 前端关键词检测 > 默认 java_coding",
+        "更新函数文档注释",
+        "grep -n param_reflection train.py 返回空结果",
+        "python -c \"import train\" 不报错"
       ],
       "priority": 8,
       "passes": false,
-      "notes": "这两条样本与原有 seed 的场景和展示行为有明显区别：17 侧重失败重试，18 侧重长链路多文件编辑。"
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "删除 test_model.py 中的 param_reflection 评估并更新引用",
+      "description": "作为评估流程，需要删除 test_param_reflection 函数，并将 evaluate_model 等函数中的 param_reflection 引用更新为 frontend_dev 占位。",
+      "acceptanceCriteria": [
+        "删除 test_param_reflection() 函数（约 L857 起）",
+        "在 evaluate_model() 中将 param_results, param_score = test_param_reflection(...) 替换为 frontend_results, frontend_score = test_frontend_dev(...) 的调用（此时 test_frontend_dev 可以是一个返回空列表和 0 分的临时占位函数）",
+        "更新 evaluation['dimensions'] 中的 key：param_reflection → frontend_dev",
+        "更新 overall 计算公式中的变量名",
+        "更新 verbose 输出中的维度名称",
+        "更新 dimension_names 映射：'frontend_dev': '前端开发'",
+        "更新所有遍历维度 key 的循环中的 param_reflection → frontend_dev",
+        "创建 test_frontend_dev() 占位函数，返回 ([], 0.0)",
+        "grep -n param_reflection test_model.py 返回空结果",
+        "python -c \"import test_model\" 不报错"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "先删除旧函数并创建占位，下一个 story 再实现完整的 test_frontend_dev。"
+    },
+    {
+      "id": "US-010",
+      "title": "实现 test_frontend_dev() 评估函数",
+      "description": "作为评估流程，需要实现完整的前端开发评估函数，包含 8-10 个测试用例覆盖全部子类别。",
+      "acceptanceCriteria": [
+        "test_frontend_dev() 评分维度：代码正确性 40%、最佳实践 30%、解释清晰度 30%",
+        "测试用例覆盖全部 8 个子类别，每个至少 1 个，共 8-10 个",
+        "每个测试用例包含：prompt、description、subcategory、check_fn（检查关键代码模式）、practice_keywords（最佳实践关键词）",
+        "返回格式 (list[dict], float)，float 为 0-100 的分数，与其他 test_xxx 函数一致",
+        "check_fn 检测关键模式如 <script setup、defineProps、ref(、ElTable 等",
+        "python -c \"import test_model\" 不报错"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "替换 US-009 中的占位函数。评估以关键词/模式匹配为主，辅以启发式规则。"
+    },
+    {
+      "id": "US-011",
+      "title": "更新 extract_seeds.py",
+      "description": "作为种子提取工具，需要移除 param_reflection 的提取逻辑，适配 frontend_dev。",
+      "acceptanceCriteria": [
+        "删除 from generate_data import generate_param_reflection 导入语句",
+        "删除 extract_param_reflection() 函数",
+        "删除 main() 中对 extract_param_reflection() 的调用和输出",
+        "更新文件验证列表：param_reflection.jsonl → frontend_dev.jsonl",
+        "在 main() 中添加对 frontend_dev.jsonl 的存在性检查和格式验证（非提取）",
+        "python extract_seeds.py 可正常运行不报错",
+        "grep -n param_reflection extract_seeds.py 返回空结果"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "frontend_dev 种子是手写 JSONL，不从 generate_data.py 提取。"
+    },
+    {
+      "id": "US-012",
+      "title": "更新 README.md",
+      "description": "作为项目文档，README 需要反映新的样本类型列表和比例。",
+      "acceptanceCriteria": [
+        "更新项目目录结构说明：param_reflection.yaml → frontend_dev.yaml，param_reflection.jsonl → frontend_dev.jsonl",
+        "更新样本类型比例表格：param_reflection 20% → frontend_dev 20% Vue3/ElementPlus/TypeScript/CSS 前端开发",
+        "所有对 param_reflection 的描述性文字同步更新",
+        "grep -n param_reflection README.md 返回空结果"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "清理所有文件中的 param_reflection 残留引用",
+      "description": "作为代码库维护，需要全局清理所有文件中对 param_reflection 的引用。",
+      "acceptanceCriteria": [
+        "清理 prd.json 中的 param_reflection 引用（如有）",
+        "清理 archive/2026-04-20-pluggable-sample-categories/prd.json 中的 param_reflection 引用",
+        "清理 tasks/prd-tool-calling-optimization.md 中的 param_reflection 引用",
+        "git grep param_reflection 返回空结果（零残留）",
+        "git grep param_reflection -- ':(exclude)tasks/prd-replace-param-reflection-with-frontend-dev.md' 返回空结果（PRD 文件本身除外）"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "最后一步，确保全局零残留。PRD 源文件本身可以保留 param_reflection 文字。"
     }
   ]
 }
