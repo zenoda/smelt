@@ -854,278 +854,23 @@ def test_task_planning(model, tokenizer, verbose=True):
     return results, dimension_score
 
 
-def test_param_reflection(model, tokenizer, verbose=True):
+def test_frontend_dev(model, tokenizer, verbose=True):
     """
-    测试参数反思能力，返回 (results, score_0_to_100)。
+    测试前端开发能力（占位函数）。
 
-    评分维度（每个用例）：
-    - 反思结论正确性 (50%): check_fn 判断回复是否符合期望的反思行为
-    - 反思过程可见性 (25%): 是否在回复中体现了推理/反思过程
-    - 行为合理性 (25%): 综合判断工具选择、参数选择、安全考虑
+    完整实现将在 US-010 中添加，包含 8-10 个测试用例覆盖全部子类别。
+    当前版本返回空结果和 0 分。
 
-    子类别分组评分：
-    - type_check: 参数类型/格式校验
-    - required_check: 必填参数检查
-    - value_reasonableness: 参数值合理性
-    - tool_selection: 工具选择推理
-    - error_correction: 错误参数自纠正
-    - execution_impact: 执行后果预估
+    返回:
+        tuple: (results: list[dict], score: float)
     """
-    tools = json.loads(TOOL_DEFINITIONS_STR)
-
-    test_cases = [
-        {
-            "prompt": "帮我把pom.xml里的spring-boot版本从3.2.5升级到3.3.0",
-            "description": "参数校验 - 先读取确认再编辑",
-            "subcategory": "required_check",
-            "check_fn": lambda r: "read_file" in r and ("3.2.5" in r or "old_text" in r or "确认" in r or "精确匹配" in r),
-            "reflection_keywords": ["先", "确认", "读取", "当前", "精确"],
-            "expected_behavior": "先读取文件确认内容再编辑",
-        },
-        {
-            "prompt": "帮我在项目里搜索所有使用了@RestController的地方",
-            "description": "参数校验 - search_files用正则",
-            "subcategory": "value_reasonableness",
-            "check_fn": lambda r: "search_files" in r and ("@RestController" in r or "include" in r),
-            "reflection_keywords": ["search_files", "pattern", "@RestController"],
-            "expected_behavior": "使用 search_files 并提供正确的搜索模式",
-        },
-        {
-            "prompt": "帮我启动Spring Boot应用",
-            "description": "后果预估 - 应该后台运行长服务",
-            "subcategory": "execution_impact",
-            "check_fn": lambda r: ("nohup" in r or "后台" in r or "&" in r or "后台运行" in r),
-            "reflection_keywords": ["nohup", "后台", "&", "长时间", "阻塞"],
-            "expected_behavior": "使用 nohup 或后台运行方式",
-        },
-        {
-            "prompt": "帮我运行一个数据迁移脚本，可能要跑30分钟",
-            "description": "后果预估 - 长时间任务后台运行",
-            "subcategory": "execution_impact",
-            "check_fn": lambda r: ("nohup" in r or "后台" in r or "&" in r),
-            "reflection_keywords": ["nohup", "后台", "&", "长时间", "30分钟"],
-            "expected_behavior": "使用 nohup 或后台运行方式",
-        },
-        {
-            "prompt": "帮我把UserService里的@Autowired改成构造器注入",
-            "description": "参数校验 - 需先读取文件确认内容",
-            "subcategory": "required_check",
-            "check_fn": lambda r: "read_file" in r and ("UserService" in r or "读取" in r or "查看" in r or "确认" in r),
-            "reflection_keywords": ["先", "读取", "查看", "确认", "UserService"],
-            "expected_behavior": "先读取文件确认内容",
-        },
-        {
-            "prompt": "帮我在项目里搜索所有硬编码的密码",
-            "description": "参数校验 - 合适的正则表达式",
-            "subcategory": "value_reasonableness",
-            "check_fn": lambda r: ("password" in r or "密码" in r) and ("search_files" in r or "正则" in r or "pattern" in r),
-            "reflection_keywords": ["password", "密码", "search_files", "正则", "pattern"],
-            "expected_behavior": "使用合适的正则表达式搜索密码相关关键词",
-        },
-        {
-            "prompt": "Spring Boot中怎么配置数据源？",
-            "description": "不应调用工具 - 知识问题",
-            "subcategory": "tool_selection",
-            "check_fn": lambda r: "datasource" in r.lower() or "数据源" in r or "配置" in r,
-            "reflection_keywords": ["datasource", "数据源", "spring", "配置"],
-            "expected_behavior": "直接回答知识问题，不调用工具",
-        },
-        {
-            "prompt": "帮我看一下project目录下的My Documents文件夹里的config",
-            "description": "参数合理性 - 路径含空格的处理",
-            "subcategory": "type_check",
-            "check_fn": lambda r: ("My Documents" in r or "My文档" in r) and ("read_file" in r or "路径" in r or "空格" in r),
-            "reflection_keywords": ["My Documents", "路径", "空格", "read_file"],
-            "expected_behavior": "正确处理含空格的路径",
-        },
-        {
-            "prompt": "帮我给项目添加Flyway数据库迁移支持",
-            "description": "工具选择推理 - 多步骤规划",
-            "subcategory": "tool_selection",
-            "check_fn": lambda r: ("步骤" in r or "首先" in r or "1." in r or "先" in r) and ("依赖" in r or "pom" in r or "配置" in r),
-            "reflection_keywords": ["步骤", "首先", "先", "依赖", "pom", "配置"],
-            "expected_behavior": "分步骤规划并从查看依赖开始",
-        },
-        {
-            "prompt": "帮我执行mvn test跑一下单元测试",
-            "description": "后果预估 - 测试不会长时间阻塞",
-            "subcategory": "execution_impact",
-            "check_fn": lambda r: "run_command" in r and "mvn test" in r,
-            "reflection_keywords": ["run_command", "mvn test"],
-            "expected_behavior": "直接执行 mvn test（短时间任务不需要后台运行）",
-        },
-        {
-            "prompt": "帮我编辑application.yml，把server.port改成9090",
-            "description": "必填参数检查 - edit_file需old_text和new_text",
-            "subcategory": "required_check",
-            "check_fn": lambda r: "read_file" in r or ("old_text" in r and "new_text" in r) or ("确认" in r or "查看" in r),
-            "reflection_keywords": ["read_file", "old_text", "new_text", "确认", "查看"],
-            "expected_behavior": "先读取文件或提供完整的 old_text 和 new_text",
-        },
-        {
-            "prompt": "帮我搜索项目里所有包含logger的变量声明",
-            "description": "参数合理性 - 正则表达式转义",
-            "subcategory": "value_reasonableness",
-            "check_fn": lambda r: "search_files" in r and ("logger" in r or "正则" in r or "转义" in r or "pattern" in r),
-            "reflection_keywords": ["search_files", "logger", "pattern", "正则"],
-            "expected_behavior": "使用 search_files 搜索 logger 声明",
-        },
-        {
-            "prompt": "帮我运行ab压力测试，发送10000个请求",
-            "description": "后果预估 - 压力测试会持续一段时间",
-            "subcategory": "execution_impact",
-            "check_fn": lambda r: "run_command" in r and ("ab" in r or "压力" in r or "10000" in r),
-            "reflection_keywords": ["run_command", "ab", "10000", "nohup", "后台"],
-            "expected_behavior": "执行 ab 压力测试命令",
-        },
-        {
-            "prompt": "帮我把项目里所有的System.out.println替换成log.info",
-            "description": "错误参数自纠正 - 需先确认类是否有log字段",
-            "subcategory": "error_correction",
-            "check_fn": lambda r: ("read_file" in r or "确认" in r or "检查" in r) and ("log" in r or "Slf4j" in r),
-            "reflection_keywords": ["先", "确认", "检查", "log", "Slf4j", "@Slf4j"],
-            "expected_behavior": "先确认类是否有 log 字段或 @Slf4j 注解",
-        },
-        {
-            "prompt": "帮我创建一个新的数据库迁移脚本",
-            "description": "参数合理性 - Flyway脚本命名规则",
-            "subcategory": "value_reasonableness",
-            "check_fn": lambda r: ("V" in r and "__" in r) or ("版本号" in r or "命名" in r or "规则" in r),
-            "reflection_keywords": ["V", "__", "版本号", "命名", "Flyway"],
-            "expected_behavior": "遵循 Flyway V{版本号}__{描述}.sql 命名规则",
-        },
-        {
-            "prompt": "帮我看看OrderService的create方法代码",
-            "description": "工具选择推理 - read_file vs search_files",
-            "subcategory": "tool_selection",
-            "check_fn": lambda r: "read_file" in r and ("OrderService" in r or "读取" in r or "查看" in r),
-            "reflection_keywords": ["read_file", "OrderService", "查看", "读取"],
-            "expected_behavior": "使用 read_file 读取文件内容",
-        },
-    ]
-
     if verbose:
         print("\n" + "=" * 60)
-        print("测试4：参数反思能力")
+        print("测试4：前端开发能力（占位）")
         print("=" * 60)
-
-    results = []
-    subcategory_scores = {}  # 子类别得分汇总
-
-    for i, tc in enumerate(test_cases, 1):
-        if verbose:
-            print(f"\n[{i}/{len(test_cases)}] {tc['description']} [{tc['subcategory']}]")
-            print(f"  问题: {tc['prompt']}")
-
-        messages = [
-            {"role": "system", "content": "你是一位智能编程助手，可以通过调用工具来帮助用户完成软件开发任务。在使用工具前，请确保参数正确：路径必须是绝对路径，必要参数不能遗漏，长时间运行的命令应使用nohup后台执行。"},
-            {"role": "user", "content": tc["prompt"]},
-        ]
-
-        response = generate(messages, model, tokenizer, max_new_tokens=1024, tools=tools)
-
-        # (1) 反思结论正确性 (50%)
-        correct = tc["check_fn"](response)
-        conclusion_score = 1.0 if correct else 0.0
-
-        # (2) 反思过程可见性 (25%)
-        # 检查回复中是否包含反思/推理关键词
-        reflection_indicators = ["需要先", "首先", "应该", "注意", "确保", "考虑",
-                                 "因为", "所以", "为了", "避免", "防止", "建议"]
-        reflection_hits = sum(1 for kw in reflection_indicators if kw in response)
-        # 检查是否有预期的反思关键词
-        expected_reflection_hits = sum(1 for kw in tc["reflection_keywords"] if kw.lower() in response.lower())
-        reflection_rate = min(1.0, (reflection_hits + expected_reflection_hits) / max(len(tc["reflection_keywords"]), 3))
-        reflection_score = reflection_rate
-
-        # (3) 行为合理性 (25%)
-        has_tool_call = "<function=" in response
-        behavior_score = 0.0
-        if tc["subcategory"] == "tool_selection":
-            # 工具选择类：check_fn 已覆盖，此处检查是否选择了合理工具
-            behavior_score = 1.0 if correct else 0.3
-        elif tc["subcategory"] == "execution_impact":
-            # 执行影响类：检查是否考虑了运行时间/后台执行
-            if has_tool_call and correct:
-                behavior_score = 1.0
-            elif has_tool_call:
-                behavior_score = 0.5  # 有工具调用但没考虑后果
-            else:
-                behavior_score = 0.2
-        elif tc["subcategory"] in ("required_check", "type_check"):
-            # 参数检查类：是否先读取/确认
-            if correct:
-                behavior_score = 1.0
-            elif has_tool_call:
-                behavior_score = 0.4  # 有调用但没先确认
-            else:
-                behavior_score = 0.1
-        elif tc["subcategory"] == "value_reasonableness":
-            # 值合理性类：参数值是否正确
-            behavior_score = 1.0 if correct else 0.3
-        elif tc["subcategory"] == "error_correction":
-            # 错误纠正类：是否识别并纠正了潜在错误
-            if correct:
-                behavior_score = 1.0
-            elif "确认" in response or "检查" in response or "先" in response:
-                behavior_score = 0.6
-            else:
-                behavior_score = 0.2
-        else:
-            behavior_score = 1.0 if correct else 0.0
-
-        # 综合得分
-        case_score = conclusion_score * 0.50 + reflection_score * 0.25 + behavior_score * 0.25
-
-        scoring_breakdown = {
-            "conclusion_score": round(conclusion_score, 3),
-            "conclusion_weight": 0.50,
-            "reflection_score": round(reflection_score, 3),
-            "reflection_weight": 0.25,
-            "reflection_indicators_hit": reflection_hits,
-            "expected_keywords_hit": expected_reflection_hits,
-            "behavior_score": round(behavior_score, 3),
-            "behavior_weight": 0.25,
-            "subcategory": tc["subcategory"],
-            "expected_behavior": tc["expected_behavior"],
-        }
-
-        # 汇总子类别得分
-        subcat = tc["subcategory"]
-        if subcat not in subcategory_scores:
-            subcategory_scores[subcat] = []
-        subcategory_scores[subcat].append(case_score)
-
-        if verbose:
-            print(f"  反思结论: {'通过' if correct else '未通过'}")
-            print(f"  反思过程: 指标命中 {reflection_hits}, 关键词命中 {expected_reflection_hits}")
-            print(f"  行为合理: {behavior_score:.0%}")
-            print(f"  综合得分: {case_score:.1%}")
-            print(f"  回复前200字: {response[:200]}...")
-
-        results.append({
-            "description": tc["description"],
-            "prompt": tc["prompt"],
-            "correct": correct,
-            "has_tool_call": has_tool_call,
-            "response": response[:800],
-            "score": case_score,
-            "subcategory": tc["subcategory"],
-            "scoring_breakdown": scoring_breakdown,
-        })
-
-    # 维度得分 = 各用例综合得分的平均值
-    dimension_score = round(sum(r["score"] for r in results) / len(results) * 100, 1)
-
-    if verbose:
-        correct_count = sum(1 for r in results if r["correct"])
-        print(f"\n参数反思正确率: {correct_count}/{len(results)}")
-        print(f"\n子类别得分:")
-        for subcat, scores in sorted(subcategory_scores.items()):
-            avg = sum(scores) / len(scores) * 100
-            print(f"  {subcat}: {avg:.1f}/100 ({len(scores)}个用例)")
-        print(f"\n参数反思维度得分: {dimension_score}/100")
-    return results, dimension_score
+        print("  [占位] 完整评估将在后续迭代实现")
+        print("  前端开发维度得分: 0.0/100")
+    return [], 0.0
 
 
 # ============================================================
@@ -1144,7 +889,7 @@ def evaluate_model(model, tokenizer, model_label: str, verbose=True):
                 "java_coding": {"results": [...], "score": float},
                 "tool_calling": {"results": [...], "score": float},
                 "task_planning": {"results": [...], "score": float},
-                "param_reflection": {"results": [...], "score": float},
+                "frontend_dev": {"results": [...], "score": float},
             },
             "overall_score": float,
         }
@@ -1157,9 +902,9 @@ def evaluate_model(model, tokenizer, model_label: str, verbose=True):
     java_results, java_score = test_java_coding(model, tokenizer, verbose=verbose)
     tool_results, tool_score = test_tool_calling(model, tokenizer, verbose=verbose)
     plan_results, plan_score = test_task_planning(model, tokenizer, verbose=verbose)
-    param_results, param_score = test_param_reflection(model, tokenizer, verbose=verbose)
+    frontend_results, frontend_score = test_frontend_dev(model, tokenizer, verbose=verbose)
 
-    overall = round((java_score + tool_score + plan_score + param_score) / 4, 1)
+    overall = round((java_score + tool_score + plan_score + frontend_score) / 4, 1)
 
     evaluation = {
         "model_label": model_label,
@@ -1167,7 +912,7 @@ def evaluate_model(model, tokenizer, model_label: str, verbose=True):
             "java_coding": {"results": java_results, "score": java_score},
             "tool_calling": {"results": tool_results, "score": tool_score},
             "task_planning": {"results": plan_results, "score": plan_score},
-            "param_reflection": {"results": param_results, "score": param_score},
+            "frontend_dev": {"results": frontend_results, "score": frontend_score},
         },
         "overall_score": overall,
     }
@@ -1179,7 +924,7 @@ def evaluate_model(model, tokenizer, model_label: str, verbose=True):
         print(f"  Java编程:   {java_score}/100")
         print(f"  工具调用:   {tool_score}/100")
         print(f"  任务规划:   {plan_score}/100")
-        print(f"  参数反思:   {param_score}/100")
+        print(f"  前端开发:   {frontend_score}/100")
         print(f"  综合得分:   {overall}/100")
 
     return evaluation
@@ -1210,7 +955,7 @@ def _pick_example(base_results, finetuned_results, dimension: str):
             b_score = b.get("case_score", 0) / 100.0
             f_score = f.get("case_score", 0) / 100.0
         else:
-            # java_coding, tool_calling, param_reflection 均使用 score (0-1)
+            # java_coding, tool_calling, frontend_dev 均使用 score (0-1)
             b_score = b.get("score", 0)
             f_score = f.get("score", 0)
 
@@ -1243,7 +988,7 @@ def generate_comparison_report(base_eval: dict, finetuned_eval: dict):
         "java_coding": "Java编程",
         "tool_calling": "工具调用",
         "task_planning": "任务规划",
-        "param_reflection": "参数反思",
+        "frontend_dev": "前端开发",
     }
 
     comparisons = {}
@@ -1307,7 +1052,7 @@ def write_comparison_markdown(report: dict, output_path: str):
     lines.append("| 维度 | 原始模型 | 微调模型 | 改进幅度 |")
     lines.append("|------|---------|---------|---------|")
 
-    for dim_key in ["java_coding", "tool_calling", "task_planning", "param_reflection"]:
+    for dim_key in ["java_coding", "tool_calling", "task_planning", "frontend_dev"]:
         c = report["comparisons"][dim_key]
         arrow = "+" if c["improvement_pct"] > 0 else ""
         lines.append(
@@ -1323,7 +1068,7 @@ def write_comparison_markdown(report: dict, output_path: str):
     # 每个维度的具体示例
     lines.append("## 具体示例对比\n")
 
-    for dim_key in ["java_coding", "tool_calling", "task_planning", "param_reflection"]:
+    for dim_key in ["java_coding", "tool_calling", "task_planning", "frontend_dev"]:
         c = report["comparisons"][dim_key]
         ex = c["example"]
         status = "提升" if c["improved"] else ("持平" if c["improvement_pct"] == 0 else "下降")
@@ -1499,7 +1244,7 @@ def run_compare_mode(args, cfg):
     print("=" * 60)
     print("对比评估结果")
     print("=" * 60)
-    for dim_key in ["java_coding", "tool_calling", "task_planning", "param_reflection"]:
+    for dim_key in ["java_coding", "tool_calling", "task_planning", "frontend_dev"]:
         c = report["comparisons"][dim_key]
         arrow = "+" if c["improvement_pct"] > 0 else ""
         status = "提升" if c["improved"] else ("持平" if c["improvement_pct"] == 0 else "下降")
