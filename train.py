@@ -47,7 +47,7 @@ def _infer_category(sample: dict) -> str:
 
     内容推断策略：
     - 包含 tool_call/tool_response XML → tool_calling
-    - system 含「参数反思/参数检查/parameter」→ param_reflection
+    - 包含前端关键词（Vue、ElementPlus、Composition API 等）→ frontend_dev
     - 默认 → java_coding
     """
     # 优先使用 metadata.category
@@ -67,17 +67,16 @@ def _infer_category(sample: dict) -> str:
 
     # 工具调用类别：检查是否包含 tool_call XML 标记
     if "<tool_call>" in full_text or "<tool_response>" in full_text:
-        # 进一步区分：参数反思 vs 普通工具调用
-        param_keywords = ["参数反思", "参数检查", "parameter reflection", "参数验证",
-                          "参数合理性", "param_reflection"]
-        if any(kw in full_text.lower() for kw in param_keywords):
-            return "param_reflection"
         return "tool_calling"
 
-    # 参数反思（无 tool_call 但内容相关）
-    param_keywords = ["参数反思", "参数检查", "parameter reflection"]
-    if any(kw in system_text.lower() for kw in param_keywords):
-        return "param_reflection"
+    # 前端开发类别：检测前端相关关键词
+    frontend_keywords = ["Vue", "ElementPlus", "Element Plus", "前端",
+                         "组件", "Composition API", "Pinia", "Vite",
+                         "defineProps", "defineEmits", "script setup",
+                         "el-table", "el-form", "axios"]
+    combined_text = system_text + full_text
+    if any(kw.lower() in combined_text.lower() for kw in frontend_keywords):
+        return "frontend_dev"
 
     # 默认：Java 编程
     return "java_coding"
