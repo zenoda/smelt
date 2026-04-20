@@ -61,11 +61,11 @@ make test       # 模型评估
 │   ├── categories/          # 样本类型 YAML 定义（可插拔）
 │   │   ├── java_coding.yaml        # Java 编程类型定义
 │   │   ├── tool_calling.yaml       # 工具调用类型定义
-│   │   └── param_reflection.yaml   # 参数反思类型定义
+│   │   └── frontend_dev.yaml       # 前端开发类型定义
 │   ├── seeds/               # 手写种子样本（Git 跟踪）
 │   │   ├── java_coding.jsonl       # 21 条 Java 编程样本
 │   │   ├── tool_calling.jsonl      # 10 条工具调用样本
-│   │   └── param_reflection.jsonl  # 21 条参数反思样本
+│   │   └── frontend_dev.jsonl      # 19 条前端开发样本
 │   └── generated/           # LLM 生成的数据（gitignored）
 ├── training_data.jsonl      # 合并后的训练数据（gitignored）
 ├── lora_adapter/             # LoRA 适配器输出（gitignored）
@@ -161,7 +161,7 @@ python generate_data.py --review
 |------|------|------|
 | `java_coding` | 50% | Spring Boot/Cloud、MyBatis、WebFlux 等 |
 | `tool_calling` | 30% | 工具调用、多步规划、错误恢复 |
-| `param_reflection` | 20% | 参数类型/缺失/合理性检查 |
+| `frontend_dev` | 20% | Vue3/ElementPlus/TypeScript/CSS 前端开发 |
 
 #### 批量生成
 
