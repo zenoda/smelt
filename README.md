@@ -66,8 +66,10 @@ make test       # 模型评估
 │   │   ├── java_coding.jsonl       # 21 条 Java 编程样本
 │   │   ├── tool_calling.jsonl      # 10 条工具调用样本
 │   │   └── frontend_dev.jsonl      # 19 条前端开发样本
-│   └── generated/           # LLM 生成的数据（gitignored）
+│   ├── generated/           # LLM 生成的数据（gitignored）
+│   └── train_unsloth.jsonl     # Unsloth 格式训练数据（gitignored）
 ├── training_data.jsonl      # 合并后的训练数据（gitignored）
+├── convert_parquet_to_unsloth.py  # Parquet → Unsloth JSONL 转换工具
 ├── lora_adapter/             # LoRA 适配器输出（gitignored）
 ├── merged_model/             # 合并模型输出（gitignored）
 ├── runs/                    # TensorBoard 日志（gitignored）
@@ -274,6 +276,49 @@ python merge_lora.py --lora_merge.method ties --lora_merge.density 0.3
 ```
 
 `train.py` 优先从 `metadata.category` 读取类别信息进行分层采样；对于无 metadata 的旧数据文件，回退到基于内容的推断。
+
+## 工具脚本
+
+### Parquet → Unsloth JSONL 转换
+
+将 Parquet 格式的数据转换为 Unsloth SFT 训练所需的 JSONL 格式。
+
+```bash
+# 基本用法
+python convert_parquet_to_unsloth.py \
+    -i data/train-00000-of-00001.parquet \
+    -o data/train_unsloth.jsonl
+
+# 支持压缩文件 (.parquet.gz)
+python convert_parquet_to_unsloth.py \
+    -i data/train-00000-of-00001.parquet.gz \
+    -o data/train_unsloth.jsonl
+
+# 指定压缩级别
+python convert_parquet_to_unsloth.py \
+    -i data/train.parquet \
+    -o data/train_unsloth.jsonl \
+    --compression snappy
+```
+
+**参数说明**:
+
+| 参数 | 说明 |
+|------|------|
+| `-i, --input` | 输入 Parquet 文件路径 |
+| `-o, --output` | 输出 JSONL 文件路径 |
+| `--compression` | 输出压缩级别 (default/infer/snappy/gzip/bz2/lz4/zstd) |
+
+**输出格式**:
+```json
+{
+  "messages": [
+    {"role": "user", "content": "<problem statement>"},
+    {"role": "assistant", "content": "<thinking>\n<reasoning>\n</thinking>\n\n<solution>"}
+  ],
+  "metadata": {"id": "...", "difficulty": "...", "category": "..."}
+}
+```
 
 ## 注意事项
 
