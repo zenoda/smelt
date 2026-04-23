@@ -771,11 +771,19 @@ def main():
     eval_metrics = None
     if eval_dataset is not None:
         print("\n运行最终验证评估...")
-        eval_metrics = trainer.evaluate()
-        final_val_loss = eval_metrics.get('eval_loss', 'N/A')
-        print(f"  验证损失: {final_val_loss}")
-        if stopped_early:
-            print(f"  （此为最优检查点的验证损失）")
+        import gc, torch as _torch
+        gc.collect()
+        _torch.cuda.empty_cache()
+        _torch.cuda.reset_peak_memory_stats()
+        try:
+            eval_metrics = trainer.evaluate()
+            final_val_loss = eval_metrics.get('eval_loss', 'N/A')
+            print(f"  验证损失: {final_val_loss}")
+            if stopped_early:
+                print(f"  （此为最优检查点的验证损失）")
+        except Exception as e:
+            print(f"  [警告] 最终验证评估失败: {e}")
+            print(f"  训练已完成，模型不受影响。跳过最终评估。")
 
     print(f"\n  TensorBoard 日志: {logging_dir}")
     print(f"  查看训练曲线: tensorboard --logdir {TB_DIR}")
