@@ -204,6 +204,19 @@ class EarlyStoppingCallback(TrainerCallback):
         self.best_step = 0
         self.stopped_early = False
 
+    def _check_should_stop(self, control):
+        """检查是否达到早停阈值，如果是则触发停止"""
+        if self.no_improve_count >= self.patience:
+            best_str = f"{self.best_val_loss:.4f}" if self.best_val_loss < float("inf") else "无"
+            print(
+                f"\n{'='*60}"
+                f"\n  早停触发！验证损失连续 {self.patience} 个评估周期未改善。"
+                f"\n  最佳 val_loss: {best_str} (step {self.best_step})"
+                f"\n{'='*60}"
+            )
+            self.stopped_early = True
+            control.should_training_stop = True
+
     def on_evaluate(self, args, state, control, metrics=None, **kwargs):
         """每次评估后检查是否应该早停"""
         if metrics is None:
@@ -211,6 +224,17 @@ class EarlyStoppingCallback(TrainerCallback):
 
         val_loss = metrics.get("eval_loss")
         if val_loss is None:
+            return
+
+        import math
+        if math.isnan(val_loss) or math.isinf(val_loss):
+            self.no_improve_count += 1
+            remaining = self.patience - self.no_improve_count
+            print(
+                f"  [早停] ⚠ val_loss 为 {val_loss}（数值异常），视为未改善，"
+                f"剩余耐心: {remaining}/{self.patience}"
+            )
+            self._check_should_stop(control)
             return
 
         if val_loss < self.best_val_loss - self.min_delta:
@@ -228,15 +252,7 @@ class EarlyStoppingCallback(TrainerCallback):
                 f"  [早停] val_loss 未改善 ({val_loss:.4f} vs 最佳 {self.best_val_loss:.4f})，"
                 f"剩余耐心: {remaining}/{self.patience}"
             )
-            if self.no_improve_count >= self.patience:
-                print(
-                    f"\n{'='*60}"
-                    f"\n  早停触发！验证损失连续 {self.patience} 个评估周期未改善。"
-                    f"\n  最佳 val_loss: {self.best_val_loss:.4f} (step {self.best_step})"
-                    f"\n{'='*60}"
-                )
-                self.stopped_early = True
-                control.should_training_stop = True
+            self._check_should_stop(control)
 
 
 class EpochSummaryCallback(TrainerCallback):
@@ -771,16 +787,24 @@ def main():
     eval_metrics = None
     if eval_dataset is not None:
         print("\n运行最终验证评估...")
-        import gc, torch as _torch
+        import gc, math, torch as _torch
         gc.collect()
         _torch.cuda.empty_cache()
-        _torch.cuda.reset_peak_memory_stats()
+        # 确保模型处于推理模式
+        model.eval()
         try:
             eval_metrics = trainer.evaluate()
-            final_val_loss = eval_metrics.get('eval_loss', 'N/A')
-            print(f"  验证损失: {final_val_loss}")
-            if stopped_early:
-                print(f"  （此为最优检查点的验证损失）")
+            final_val_loss = eval_metrics.get('eval_loss', None)
+
+            if final_val_loss is not None and (math.isnan(final_val_loss) or math.isinf(final_val_loss)):
+                print(f"  [警告] 最终验证损失为 {final_val_loss}（数值异常）")
+                if early_stopping_cb is not None and early_stopping_cb.best_val_loss < float("inf"):
+                    print(f"  参考: 训练过程中的最佳 val_loss: {early_stopping_cb.best_val_loss:.4f} (step {early_stopping_cb.best_step})")
+                print(f"  提示: 这通常是训练结束后模型状态/精度问题导致的，不影响已保存的最佳检查点")
+            else:
+                print(f"  验证损失: {final_val_loss}")
+                if stopped_early:
+                    print(f"  （此为最优检查点的验证损失）")
         except Exception as e:
             print(f"  [警告] 最终验证评估失败: {e}")
             print(f"  训练已完成，模型不受影响。跳过最终评估。")
@@ -792,6 +816,12 @@ def main():
     print("\n保存模型...")
 
     # 保存LoRA适配器
+    if use_load_best:
+        print(f"  当前模型: 最佳检查点（由 load_best_model_at_end 自动加载）")
+        if early_stopping_cb is not None and early_stopping_cb.best_val_loss < float("inf"):
+            print(f"  最佳 val_loss: {early_stopping_cb.best_val_loss:.4f} (step {early_stopping_cb.best_step})")
+    else:
+        print(f"  当前模型: 最后一个 epoch 的权重（未启用 load_best_model_at_end）")
     model.save_pretrained(ADAPTER_DIR)
     tokenizer.save_pretrained(ADAPTER_DIR)
     print(f"LoRA适配器已保存到: {ADAPTER_DIR}/")
