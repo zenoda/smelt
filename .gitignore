@@ -44,3 +44,9 @@ config/config.yaml
 
 # nohup output
 nohup.out
+
+# Ralph prompt
+prompt.md
+prd.json
+progress.txt
+
