@@ -46,6 +46,7 @@ config/config.yaml
 nohup.out
 
 # Ralph prompt
+tasks/
 prompt.md
 prd.json
 progress.txt
