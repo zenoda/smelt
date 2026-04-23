@@ -12,7 +12,7 @@ __pycache__/
 *_merged/
 
 # Training checkpoints
-outputs_*/
+outputs/
 
 # Unsloth compiled kernel cache
 unsloth_compiled_cache/
