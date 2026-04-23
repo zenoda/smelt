@@ -1,5 +1,5 @@
 # ============================================================
-# QLoRA Training Pipeline Makefile
+# Smelt - QLoRA Training Pipeline Makefile
 # ============================================================
 #
 # 用法:
@@ -54,7 +54,7 @@ EXPERIMENTS_DIR := experiments
 .PHONY: help
 help:
 	@echo "============================================================"
-	@echo "  QLoRA Training Pipeline"
+	@echo "  Smelt - QLoRA Training Pipeline"
 	@echo "============================================================"
 	@echo ""
 	@echo "可用目标:"

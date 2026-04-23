@@ -1,5 +1,5 @@
 {
-  "project": "CoPaw Training Pipeline",
+  "project": "Smelt",
   "branchName": "ralph/replace-param-reflection-with-frontend-dev",
   "description": "删除 frontend_dev 样本类型，新增 frontend_dev 前端开发样本类型（Vue3/TypeScript/ElementPlus），保持 50%/30%/20% 训练比例",
   "userStories": [

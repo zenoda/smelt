@@ -1,10 +1,10 @@
-# QLoRA Training Pipeline
+# Smelt
 
-通用 QLoRA 微调训练流水线，支持任意兼容 Unsloth 的语言模型（如 Qwen、LLaMA、Mistral 等）。当前训练目标为提升模型在以下方面的能力：
+通用 QLoRA 微调训练流水线，支持任意兼容 Unsloth 的小尺寸稠密语言模型（如 Qwen、LLaMA、Mistral 等）。当前训练目标为提升模型在以下方面的能力：
 
 1. **Java 编程** — Spring Boot/Cloud、MyBatis、Flyway、WebFlux、异常诊断
 2. **任务拆解与工具调用** — 步骤规划、严格的 tool_call XML 格式遵循
-3. **参数反思** — 参数类型检查、缺失检测、值合理性判断
+3. **前端开发** — Vue3、ElementPlus、TypeScript、CSS
 
 ## 硬件要求
 
