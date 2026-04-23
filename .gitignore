@@ -6,7 +6,7 @@ __pycache__/
 *.pyc
 
 # LoRA adapter weights
-*_lora/
+lora_adapter/
 
 # Merged model weights (large files)
 *_merged/
@@ -25,6 +25,7 @@ experiments/
 
 # Generated training data
 data/generated/
+data/backup/
 
 # Merged training data file
 training_data.jsonl
